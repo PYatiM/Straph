@@ -1,0 +1,18 @@
+{
+  "model_version": "checkout-v0",
+  "workflow": "Order",
+  "start_state": "S0",
+  "states": [{"id": "S0"}, {"id": "S1"}, {"id": "S2"}, {"id": "S3", "terminal": true}, {"id": "S4", "terminal": true}],
+  "operations": [
+    {"id": "create", "method": "POST", "path_template": "/orders", "one_shot": true, "allowed_roles": ["customer"]},
+    {"id": "pay", "method": "POST", "path_template": "/orders/{id}/payment", "one_shot": true, "allowed_roles": ["customer"]},
+    {"id": "confirm", "method": "POST", "path_template": "/orders/{id}/confirm", "one_shot": true, "allowed_roles": ["customer"]},
+    {"id": "cancel", "method": "POST", "path_template": "/orders/{id}/cancel", "one_shot": false, "allowed_roles": ["customer"]}
+  ],
+  "transitions": [
+    {"id": "T1", "operation": "create", "from": ["S0"], "to": "S1", "provenance": "spec"},
+    {"id": "T2", "operation": "pay", "from": ["S1"], "to": "S2", "provenance": "spec"},
+    {"id": "T3", "operation": "confirm", "from": ["S2"], "to": "S3", "provenance": "spec"},
+    {"id": "T4", "operation": "cancel", "from": ["S1", "S2"], "to": "S4", "provenance": "spec"}
+  ]
+}

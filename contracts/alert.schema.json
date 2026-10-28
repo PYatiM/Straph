@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "straph/alert.schema.json",
+  "title": "Alert (output of the deterministic core)",
+  "description": "Proposed contract. The ranker may add rank_score; no detector rule reads it.",
+  "type": "object",
+  "required": ["alert_id", "event_id", "label", "rule", "severity", "subject", "expected_path", "observed", "missing", "model_version"],
+  "additionalProperties": false,
+  "properties": {
+    "alert_id": {"type": "string", "minLength": 1},
+    "event_id": {"type": "string", "minLength": 1},
+    "label": {"enum": ["SKIPPED", "OUT_OF_ORDER", "REPLAYED", "IDENTITY_MISMATCH", "UNMODELED"]},
+    "rule": {"enum": ["R0", "R1", "R2", "R3", "R4"]},
+    "severity": {"enum": ["attempted", "accepted"]},
+    "subject": {"type": "string", "minLength": 1},
+    "resource_type": {"type": ["string", "null"]},
+    "resource_id": {"type": ["string", "null"]},
+    "expected_path": {"type": "array", "items": {"type": "string"}},
+    "observed": {
+      "type": "object",
+      "required": ["operation", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "operation": {"type": "string"},
+        "state": {"type": ["string", "null"]},
+        "status": {"type": "integer"}
+      }
+    },
+    "missing": {"type": "array", "items": {"type": "string"}},
+    "owasp_class": {"type": ["string", "null"]},
+    "flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tainted": {"type": "boolean"},
+        "late": {"type": "boolean"},
+        "retry": {"type": "boolean"}
+      }
+    },
+    "model_version": {"type": "string", "minLength": 1},
+    "rank_score": {"type": ["number", "null"]}
+  }
+}

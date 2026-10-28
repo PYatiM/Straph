@@ -1,0 +1,10 @@
+# Replace the placeholders with real GitHub handles.
+/contracts/                 @TODO-yathin @TODO-mohitkumar
+/services/gateway/          @TODO-yathin
+/services/model_builder/    @TODO-yathin
+/services/detector/         @TODO-mohitkumar
+/services/ranker/           @TODO-mufeez
+/services/dashboard/        @TODO-mufeez
+/services/evaluation/       @TODO-yash
+/docs/                      @TODO-yathin
+/.github/                   @TODO-yathin

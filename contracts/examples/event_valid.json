@@ -1,0 +1,1 @@
+{"event_id": "e-000123", "ts_received": "2026-10-13T09:00:00.120Z", "ts_completed": "2026-10-13T09:00:00.180Z", "session_id": "s-a1", "token_id": "tok-a1", "identity": "user-A", "role": "customer", "method": "POST", "path_template": "/orders/{id}/payment", "resource_type": "Order", "resource_id": "1042", "status": 202}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "straph/model.schema.json",
+  "title": "Reference workflow model (versioned export)",
+  "description": "Proposed contract. Invariants (target-uniqueness, referenced states exist) are checked in tests, not by the schema.",
+  "type": "object",
+  "required": ["model_version", "workflow", "start_state", "states", "operations", "transitions"],
+  "additionalProperties": false,
+  "properties": {
+    "model_version": {"type": "string", "minLength": 1},
+    "workflow": {"type": "string", "minLength": 1},
+    "start_state": {"type": "string"},
+    "states": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["id"], "additionalProperties": false,
+        "properties": {"id": {"type": "string"}, "terminal": {"type": "boolean"}}
+      }
+    },
+    "operations": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["id", "method", "path_template", "one_shot", "allowed_roles"], "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]},
+          "path_template": {"type": "string"},
+          "one_shot": {"type": "boolean"},
+          "allowed_roles": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+        }
+      }
+    },
+    "transitions": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["id", "operation", "from", "to", "provenance"], "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "operation": {"type": "string"},
+          "from": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+          "to": {"type": "string"},
+          "provenance": {"enum": ["spec", "trace", "both"]},
+          "support_count": {"type": "integer", "minimum": 0},
+          "review_status": {"enum": ["confirmed", "candidate", "rejected"]}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "straph/event.schema.json",
+  "title": "API event (one per completed call)",
+  "description": "Proposed contract. Emitted by the gateway after the response, so status and created resource ids are known.",
+  "type": "object",
+  "required": ["event_id", "ts_completed", "identity", "role", "method", "path_template", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "ts_received": {"type": "string", "format": "date-time"},
+    "ts_completed": {"type": "string", "format": "date-time"},
+    "session_id": {"type": "string"},
+    "token_id": {"type": "string"},
+    "identity": {"type": "string", "minLength": 1},
+    "role": {"type": "string", "minLength": 1},
+    "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]},
+    "path_template": {"type": "string", "pattern": "^/"},
+    "resource_type": {"type": ["string", "null"]},
+    "resource_id": {"type": ["string", "null"]},
+    "status": {"type": "integer", "minimum": 100, "maximum": 599}
+  }
+}

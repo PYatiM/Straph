@@ -1,0 +1,1 @@
+{"event_id": "e-000124", "ts_completed": "2026-10-13T09:00:01Z", "identity": "user-A", "role": "customer", "method": "FETCH", "path_template": "orders/1042", "status": 99}

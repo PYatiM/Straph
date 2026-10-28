@@ -1,0 +1,7 @@
+# <type>(<scope>): <short summary, imperative, max 72 chars>
+#
+# Types: feat fix docs test refactor chore ci perf contract
+# Scopes: gateway model detector ranker dashboard eval contracts infra docs
+#
+# Body: what and why (not how). Reference the task id, for example T15.
+# Footer: Refs: T15  |  BREAKING CHANGE: <what contract changed>
