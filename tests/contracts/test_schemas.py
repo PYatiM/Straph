@@ -1,4 +1,5 @@
 """Contract tests: examples validate, a bad event fails, and model invariants hold."""
+
 import json
 from pathlib import Path
 
@@ -33,7 +34,9 @@ def test_valid_examples_pass(schema, example):
 
 
 def test_invalid_event_fails():
-    errors = list(validator("event.schema.json").iter_errors(load(C / "examples" / "event_invalid.json")))
+    errors = list(
+        validator("event.schema.json").iter_errors(load(C / "examples" / "event_invalid.json"))
+    )
     assert errors, "the invalid example must be rejected"
 
 
