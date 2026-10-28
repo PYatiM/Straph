@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, validators
 
 ROOT = Path(__file__).resolve().parents[2]
 C = ROOT / "contracts"
@@ -16,8 +16,9 @@ def load(path):
 
 def validator(name):
     schema = load(C / name)
-    Draft202012Validator.check_schema(schema)
-    return Draft202012Validator(schema)
+    cls = validators.validator_for(schema, default=Draft202012Validator)
+    cls.check_schema(schema)
+    return cls(schema)
 
 
 @pytest.mark.parametrize(
