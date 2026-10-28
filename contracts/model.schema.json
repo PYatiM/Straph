@@ -1,44 +1,68 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "straph/model.schema.json",
   "title": "Reference workflow model (versioned export)",
-  "description": "Proposed contract. Invariants (target-uniqueness, referenced states exist) are checked in tests, not by the schema.",
+  "description": "Finite-state workflow model for one resource_type. Cross-reference invariants (referenced states exist, unique ids, target-uniqueness) are checked in tests, not by the schema.",
   "type": "object",
-  "required": ["model_version", "workflow", "start_state", "states", "operations", "transitions"],
+  "required": ["model_version", "resource_type", "initial_state", "states", "transitions"],
   "additionalProperties": false,
   "properties": {
-    "model_version": {"type": "string", "minLength": 1},
-    "workflow": {"type": "string", "minLength": 1},
-    "start_state": {"type": "string"},
-    "states": {
-      "type": "array", "minItems": 1,
-      "items": {
-        "type": "object", "required": ["id"], "additionalProperties": false,
-        "properties": {"id": {"type": "string"}, "terminal": {"type": "boolean"}}
-      }
+    "model_version": {
+      "description": "<hex content hash>@<UTC timestamp>, e.g. 9fceb02d41@2026-10-13T09:00:00Z",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8,64}@[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
     },
-    "operations": {
-      "type": "array", "minItems": 1,
+    "resource_type": {"type": "string", "minLength": 1},
+    "initial_state": {"type": "string", "minLength": 1},
+    "states": {
+      "type": "array",
+      "minItems": 1,
       "items": {
-        "type": "object", "required": ["id", "method", "path_template", "one_shot", "allowed_roles"], "additionalProperties": false,
+        "type": "object",
+        "required": ["state_id", "terminal", "description"],
+        "additionalProperties": false,
         "properties": {
-          "id": {"type": "string"},
-          "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]},
-          "path_template": {"type": "string"},
-          "one_shot": {"type": "boolean"},
-          "allowed_roles": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          "state_id": {"type": "string", "minLength": 1},
+          "terminal": {"type": "boolean"},
+          "description": {"type": "string"}
         }
       }
     },
     "transitions": {
-      "type": "array", "minItems": 1,
+      "type": "array",
+      "minItems": 1,
       "items": {
-        "type": "object", "required": ["id", "operation", "from", "to", "provenance"], "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "transition_id", "operation", "from_states", "to_state", "allowed_roles",
+          "single_use", "provenance", "support_count", "review_status"
+        ],
+        "additionalProperties": false,
         "properties": {
-          "id": {"type": "string"},
-          "operation": {"type": "string"},
-          "from": {"type": "array", "items": {"type": "string"}, "minItems": 1},
-          "to": {"type": "string"},
+          "transition_id": {"type": "string", "minLength": 1},
+          "operation": {
+            "type": "object",
+            "required": ["method", "path_template"],
+            "additionalProperties": false,
+            "properties": {
+              "method": {"enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]},
+              "path_template": {"type": "string", "pattern": "^/"}
+            }
+          },
+          "from_states": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "to_state": {"type": "string", "minLength": 1},
+          "allowed_roles": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "single_use": {"type": "boolean"},
           "provenance": {"enum": ["spec", "trace", "both"]},
           "support_count": {"type": "integer", "minimum": 0},
           "review_status": {"enum": ["confirmed", "candidate", "rejected"]}

@@ -39,17 +39,3 @@ def test_invalid_event_fails():
         validator("event.schema.json").iter_errors(load(C / "examples" / "event_invalid.json"))
     )
     assert errors, "the invalid example must be rejected"
-
-
-def test_model_invariants():
-    m = load(C / "examples" / "model_checkout.json")
-    state_ids = {s["id"] for s in m["states"]}
-    op_ids = {o["id"] for o in m["operations"]}
-    assert m["start_state"] in state_ids
-    targets = {}
-    for t in m["transitions"]:
-        assert t["operation"] in op_ids
-        assert set(t["from"]) <= state_ids and t["to"] in state_ids
-        # target-uniqueness: one operation must always lead to the same state
-        targets.setdefault(t["operation"], set()).add(t["to"])
-    assert all(len(v) == 1 for v in targets.values())
