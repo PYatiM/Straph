@@ -2,42 +2,122 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "straph/alert.schema.json",
   "title": "Alert (output of the deterministic core)",
-  "description": "Proposed contract. The ranker may add rank_score; no detector rule reads it.",
+  "description": "Detection alert contract. The ML ranker may attach rank_score; core detection rules never read it.",
   "type": "object",
-  "required": ["alert_id", "event_id", "label", "rule", "severity", "subject", "expected_path", "observed", "missing", "model_version"],
+  "required": [
+    "alert_id",
+    "event_id",
+    "timestamp",
+    "label",
+    "rule",
+    "severity",
+    "subject",
+    "resource",
+    "expected_path",
+    "observed",
+    "missing",
+    "owasp_class",
+    "flags",
+    "model_version"
+  ],
   "additionalProperties": false,
   "properties": {
-    "alert_id": {"type": "string", "minLength": 1},
-    "event_id": {"type": "string", "minLength": 1},
-    "label": {"enum": ["SKIPPED", "OUT_OF_ORDER", "REPLAYED", "IDENTITY_MISMATCH", "UNMODELED"]},
-    "rule": {"enum": ["R0", "R1", "R2", "R3", "R4"]},
-    "severity": {"enum": ["attempted", "accepted"]},
-    "subject": {"type": "string", "minLength": 1},
-    "resource_type": {"type": ["string", "null"]},
-    "resource_id": {"type": ["string", "null"]},
-    "expected_path": {"type": "array", "items": {"type": "string"}},
+    "alert_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "label": {
+      "enum": ["SKIPPED", "OUT_OF_ORDER", "REPLAYED", "IDENTITY_MISMATCH", "UNMODELED"]
+    },
+    "rule": {
+      "enum": ["R0", "R1", "R2", "R3", "R4"]
+    },
+    "severity": {
+      "enum": ["attempted", "accepted"]
+    },
+    "subject": {
+      "type": "object"
+    },
+    "resource": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "expected_path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "observed": {
       "type": "object",
-      "required": ["operation", "status"],
+      "required": ["operation", "state", "status_code"],
       "additionalProperties": false,
       "properties": {
-        "operation": {"type": "string"},
-        "state": {"type": ["string", "null"]},
-        "status": {"type": "integer"}
+        "operation": {
+          "type": "string"
+        },
+        "state": {
+          "type": ["string", "null"]
+        },
+        "status_code": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        }
       }
     },
-    "missing": {"type": "array", "items": {"type": "string"}},
-    "owasp_class": {"type": ["string", "null"]},
+    "missing": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "owasp_class": {
+      "type": "string"
+    },
     "flags": {
       "type": "object",
+      "required": ["tainted", "late", "retry"],
       "additionalProperties": false,
       "properties": {
-        "tainted": {"type": "boolean"},
-        "late": {"type": "boolean"},
-        "retry": {"type": "boolean"}
+        "tainted": {
+          "type": "boolean"
+        },
+        "late": {
+          "type": "boolean"
+        },
+        "retry": {
+          "type": "boolean"
+        }
       }
     },
-    "model_version": {"type": "string", "minLength": 1},
-    "rank_score": {"type": ["number", "null"]}
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rank_score": {
+      "type": ["number", "null"],
+      "minimum": 0.0,
+      "maximum": 1.0
+    }
   }
 }
