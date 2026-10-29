@@ -245,3 +245,4 @@ def test_score_invalid_sequence_raises(invalid_input: Any) -> None:
     baseline.fit([LEGAL_CHECKOUT_SEQUENCE])
     with pytest.raises((TypeError, BaselineValidationError)):
         baseline.score_sequence(invalid_input)
+
