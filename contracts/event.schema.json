@@ -18,6 +18,11 @@
     "path_template": {"type": "string", "pattern": "^/"},
     "resource_type": {"type": ["string", "null"]},
     "resource_id": {"type": ["string", "null"]},
+    "idempotency_key": {
+      "description": "Optional client-supplied Idempotency-Key. Repeats of an operation sharing a key are retries, not replays.",
+      "type": "string",
+      "minLength": 1
+    },
     "status": {"type": "integer", "minimum": 100, "maximum": 599}
   }
 }
