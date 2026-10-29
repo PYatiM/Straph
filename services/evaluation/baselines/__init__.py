@@ -1,5 +1,9 @@
 """Sequence baseline algorithms and interfaces for IDS evaluation."""
 
+from services.evaluation.baselines.calibration import (
+    calibrate_threshold,
+    select_threshold_from_scores,
+)
 from services.evaluation.baselines.interfaces import (
     BaselineError,
     BaselineNotFittedError,
@@ -16,4 +20,6 @@ __all__ = [
     "BaselineValidationError",
     "NGramBaseline",
     "SequenceBaselineProtocol",
+    "calibrate_threshold",
+    "select_threshold_from_scores",
 ]
