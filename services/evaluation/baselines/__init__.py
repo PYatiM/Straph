@@ -11,6 +11,10 @@ from services.evaluation.baselines.interfaces import (
     BaseSequenceBaseline,
     SequenceBaselineProtocol,
 )
+from services.evaluation.baselines.manager import (
+    BaselineEvaluationResult,
+    BaselineManager,
+)
 from services.evaluation.baselines.markov import (
     END_TOKEN,
     START_TOKEN,
@@ -24,6 +28,8 @@ __all__ = [
     "START_TOKEN",
     "BaseSequenceBaseline",
     "BaselineError",
+    "BaselineEvaluationResult",
+    "BaselineManager",
     "BaselineNotFittedError",
     "BaselineValidationError",
     "FirstOrderMarkovBaseline",

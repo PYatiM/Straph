@@ -225,4 +225,3 @@ def test_explain_violation_unfitted_raises() -> None:
     baseline = TraceInvariantBaseline()
     with pytest.raises(BaselineNotFittedError):
         baseline.explain_violation(CHECKOUT_SKIP_PAYMENT_FLOW)
-
