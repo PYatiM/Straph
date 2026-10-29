@@ -7,11 +7,13 @@ from services.evaluation.baselines.interfaces import (
     BaseSequenceBaseline,
     SequenceBaselineProtocol,
 )
+from services.evaluation.baselines.ngram import NGramBaseline
 
 __all__ = [
     "BaseSequenceBaseline",
     "BaselineError",
     "BaselineNotFittedError",
     "BaselineValidationError",
+    "NGramBaseline",
     "SequenceBaselineProtocol",
 ]

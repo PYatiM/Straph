@@ -1,2 +1,1 @@
 """Straph core services package."""
-

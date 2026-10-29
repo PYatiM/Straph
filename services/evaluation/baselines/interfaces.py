@@ -439,4 +439,3 @@ class BaseSequenceBaseline(abc.ABC):
                 f"Deserialized object type {type(obj).__name__} does not match expected {cls.__name__}."
             )
         return obj
-
