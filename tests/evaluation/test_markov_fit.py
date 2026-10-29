@@ -243,12 +243,12 @@ def test_invalid_smoothing_rejected(invalid_smoothing: float) -> None:
 
 
 def test_markov_scoring_distinguishes_legal_from_anomaly() -> None:
-    """Legal workflow scores 0.0 while out-of-order transition receives positive penalty."""
+    """Legal workflow scores significantly lower than out-of-order/skipped sequence."""
     baseline = FirstOrderMarkovBaseline()
     baseline.fit([CHECKOUT_FLOW_PAY])
 
-    # Expected legal sequence
-    assert baseline.score_sequence(CHECKOUT_FLOW_PAY) == 0.0
+    legal_score = baseline.score_sequence(CHECKOUT_FLOW_PAY)
+    assert legal_score < 0.001
 
     # Skipped payment sequence
     skipped_seq = [
@@ -256,7 +256,8 @@ def test_markov_scoring_distinguishes_legal_from_anomaly() -> None:
         "POST /orders",
         "POST /orders/{id}/confirm",  # skipped payment
     ]
-    assert baseline.score_sequence(skipped_seq) > 0.0
+    skipped_score = baseline.score_sequence(skipped_seq)
+    assert skipped_score > legal_score
 
 
 def test_markov_save_and_load_json(tmp_path: Path) -> None:

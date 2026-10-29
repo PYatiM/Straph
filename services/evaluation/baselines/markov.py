@@ -30,7 +30,8 @@ class FirstOrderMarkovBaseline(BaseSequenceBaseline):
 
     def __init__(
         self,
-        smoothing: float = 0.0,
+        epsilon: float = 1e-4,
+        smoothing: float | None = None,
         start_token: str = START_TOKEN,
         end_token: str = END_TOKEN,
         **params: Any,
@@ -38,13 +39,14 @@ class FirstOrderMarkovBaseline(BaseSequenceBaseline):
         """Initialize FirstOrderMarkovBaseline.
 
         Args:
-            smoothing: Smoothing parameter for unobserved transitions during scoring.
+            epsilon: Smoothing floor parameter (default 1e-4).
+            smoothing: Alias for epsilon for backward compatibility.
             start_token: Symbol representing the beginning of a trace (default '^').
             end_token: Symbol representing the end of a trace (default '$').
             **params: Additional parameters passed to BaseSequenceBaseline.
 
         Raises:
-            BaselineValidationError: If tokens are empty, identical, or smoothing < 0.
+            BaselineValidationError: If tokens are empty, identical, or epsilon out of [0, 1].
             TypeError: If parameter types are invalid.
         """
         if not isinstance(start_token, str) or not start_token.strip():
@@ -54,20 +56,29 @@ class FirstOrderMarkovBaseline(BaseSequenceBaseline):
         if start_token == end_token:
             raise BaselineValidationError("start_token and end_token must be distinct")
 
-        if isinstance(smoothing, bool) or not isinstance(smoothing, (int, float)):
-            raise TypeError(f"smoothing must be a float or int, got {type(smoothing).__name__}")
-        if math.isnan(smoothing) or math.isinf(smoothing) or smoothing < 0.0:
+        effective_eps = smoothing if smoothing is not None else epsilon
+        param_name = "smoothing" if smoothing is not None else "epsilon"
+        if isinstance(effective_eps, bool) or not isinstance(effective_eps, (int, float)):
+            raise TypeError(
+                f"{param_name} must be a float or int, got {type(effective_eps).__name__}"
+            )
+        if (
+            math.isnan(effective_eps)
+            or math.isinf(effective_eps)
+            or not (0.0 <= effective_eps <= 1.0)
+        ):
             raise BaselineValidationError(
-                f"smoothing must be a finite non-negative number, got {smoothing}"
+                f"{param_name} must be a finite non-negative number in [0.0, 1.0], got {effective_eps}"
             )
 
         super().__init__(
-            smoothing=smoothing,
+            epsilon=float(effective_eps),
             start_token=start_token,
             end_token=end_token,
             **params,
         )
-        self.smoothing: float = float(smoothing)
+        self.epsilon: float = float(effective_eps)
+        self.smoothing: float = self.epsilon
         self.start_token: str = start_token
         self.end_token: str = end_token
 
@@ -167,26 +178,37 @@ class FirstOrderMarkovBaseline(BaseSequenceBaseline):
 
         self._is_fitted = True
 
-    def score_sequence(self, sequence: list[str]) -> float:
-        """Score an observed sequence using average negative log-transition probabilities.
+    def score_sequence(self, sequence: list[str], epsilon: float | None = None) -> float:
+        """Compute anomaly score as the average negative log transition probability across the chain.
+
+        Formula:
+            score = -1/K * sum_{i=1}^K ln( (1 - epsilon) * P(op_i | op_{i-1}) + epsilon * (1 / |V|) )
+
+        where epsilon is a smoothing floor (default 1e-4) and |V| is the destination vocabulary size.
 
         Args:
             sequence: Sequence of API operations.
+            epsilon: Optional smoothing floor override. Defaults to self.epsilon (1e-4).
 
         Returns:
-            Anomaly score as a float (0.0 for perfectly expected transitions).
+            Anomaly score as a non-negative float.
         """
         self.check_is_fitted()
         self.validate_sequence(sequence)
         normalized = self.normalize_sequence(sequence)
+
+        eps = self.epsilon if epsilon is None else float(epsilon)
+        if isinstance(eps, bool) or not isinstance(eps, (int, float)):
+            raise TypeError(f"epsilon must be a float or int, got {type(eps).__name__}")
+        if math.isnan(eps) or math.isinf(eps) or not (0.0 <= eps <= 1.0):
+            raise BaselineValidationError(f"epsilon must be in [0.0, 1.0], got {eps}")
 
         augmented = [self.start_token] + normalized + [self.end_token]
         total_transitions = len(augmented) - 1
         if total_transitions == 0:
             return 0.0
 
-        vocab_size = max(len(self._vocab), 1) + 1  # includes end token
-        effective_smoothing = self.smoothing if self.smoothing > 0.0 else 0.01
+        vocab_size = max(len(self._vocab) + 1, 1)  # vocabulary of operations + end_token
 
         nll_sum = 0.0
         for i in range(total_transitions):
@@ -194,23 +216,11 @@ class FirstOrderMarkovBaseline(BaseSequenceBaseline):
             dst = augmented[i + 1]
 
             row = self._transitions.get(src, {})
-            row_counts = self._transition_counts.get(src, {})
-            prefix_total = sum(row_counts.values())
+            p_transition = row.get(dst, 0.0)
 
-            prob = row.get(dst, 0.0)
-            if prob == 1.0:
-                # Deterministic expected transition contributes 0.0 penalty
-                nll = 0.0
-            elif prob > 0.0:
-                nll = -math.log(prob)
-            else:
-                # Unseen transition: smoothed penalty avoiding division-by-zero
-                smoothed_prob = effective_smoothing / (
-                    prefix_total + effective_smoothing * vocab_size
-                )
-                nll = -math.log(max(smoothed_prob, 1e-12))
-
-            nll_sum += nll
+            # Smoothed transition probability: (1 - eps) * P(op_i | op_{i-1}) + eps * (1 / |V|)
+            smoothed_p = (1.0 - eps) * p_transition + eps * (1.0 / vocab_size)
+            nll_sum += -math.log(max(smoothed_p, 1e-12))
 
         return nll_sum / total_transitions
 
@@ -226,6 +236,7 @@ class FirstOrderMarkovBaseline(BaseSequenceBaseline):
             "vocab": sorted(self._vocab),
             "start_token": self.start_token,
             "end_token": self.end_token,
+            "epsilon": self.epsilon,
         }
 
     def _set_state(self, state: dict[str, Any]) -> None:
@@ -235,3 +246,5 @@ class FirstOrderMarkovBaseline(BaseSequenceBaseline):
         self._vocab = set(state.get("vocab", []))
         self.start_token = state.get("start_token", self.start_token)
         self.end_token = state.get("end_token", self.end_token)
+        self.epsilon = float(state.get("epsilon", self.epsilon))
+        self.smoothing = self.epsilon
