@@ -125,16 +125,21 @@ class NGramBaseline(BaseSequenceBaseline):
         self._is_fitted = True
 
     def score_sequence(self, sequence: list[str]) -> float:
-        """Score an observed sequence of API operations using negative log-likelihood.
+        """Score an observed sequence of API operations using negative log-probability.
 
-        Computes length-normalized negative log-likelihood with Laplace smoothing.
-        Higher scores indicate greater deviation/anomalousness.
+        Computes length-normalized average negative log-probability across constituent n-grams
+        using Laplace smoothing:
+            P(w_i | w_{i-n+1}^{i-1}) = (count(w_{i-n+1}^i) + alpha) / (count(w_{i-n+1}^{i-1}) + alpha * |V|)
+
+        Score is 0.0 for perfectly expected sequences (where every transition has count == prefix_count > 0)
+        and scales positively with unseen or unexpected transitions.
+        Unseen n-grams and zero counts are safely smoothed without triggering division-by-zero.
 
         Args:
             sequence: Sequence of API operations.
 
         Returns:
-            Anomaly score as a non-negative float.
+            Anomaly score as a non-negative float (0.0 for perfectly expected).
         """
         self.check_is_fitted()
         self.validate_sequence(sequence)
@@ -144,16 +149,22 @@ class NGramBaseline(BaseSequenceBaseline):
             return 0.0
 
         vocab_size = max(len(self._vocab), 1)
-        effective_alpha = self.alpha if self.alpha > 0.0 else 1e-6
+        effective_alpha = self.alpha if self.alpha > 0.0 else 1e-12
 
-        # If sequence is shorter than n, evaluate with unigrams
+        # If sequence is shorter than n, evaluate with constituent unigrams
         if len(normalized) < self.n:
             total_unigrams = sum(self._unigram_counts.values())
             nll_sum = 0.0
             for op in normalized:
                 count = self._unigram_counts.get(op, 0)
-                prob = (count + effective_alpha) / (total_unigrams + effective_alpha * vocab_size)
-                nll_sum += -math.log(max(prob, 1e-12))
+                if count > 0 and count == total_unigrams:
+                    nll = 0.0
+                else:
+                    prob = (count + effective_alpha) / (
+                        total_unigrams + effective_alpha * vocab_size
+                    )
+                    nll = -math.log(max(prob, 1e-12))
+                nll_sum += nll
             return nll_sum / len(normalized)
 
         # Standard n-gram conditional evaluation
@@ -163,12 +174,21 @@ class NGramBaseline(BaseSequenceBaseline):
             count = self._ngram_counts.get(gram, 0)
             if self.n == 1:
                 total_tokens = sum(self._ngram_counts.values())
-                prob = (count + effective_alpha) / (total_tokens + effective_alpha * vocab_size)
+                if count == total_tokens and count > 0:
+                    nll = 0.0
+                else:
+                    prob = (count + effective_alpha) / (total_tokens + effective_alpha * vocab_size)
+                    nll = -math.log(max(prob, 1e-12))
             else:
                 prefix = gram[:-1]
                 prefix_count = self._prefix_counts.get(prefix, 0)
-                prob = (count + effective_alpha) / (prefix_count + effective_alpha * vocab_size)
-            nll_sum += -math.log(max(prob, 1e-12))
+                if count == prefix_count and count > 0:
+                    # Perfectly expected transition (100% deterministic in clean data)
+                    nll = 0.0
+                else:
+                    prob = (count + effective_alpha) / (prefix_count + effective_alpha * vocab_size)
+                    nll = -math.log(max(prob, 1e-12))
+            nll_sum += nll
 
         return nll_sum / len(ngrams)
 
