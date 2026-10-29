@@ -1,8 +1,11 @@
 repos:
-  - repo: local
-    hooks:
-      - id: ruff
-        name: ruff
-        entry: ruff check
-        language: system
-        types: [python]
+- hooks:
+  - additional_dependencies:
+    - ruff
+    entry: ruff check
+    id: ruff
+    language: python
+    name: ruff
+    types:
+    - python
+  repo: local
