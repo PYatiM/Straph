@@ -272,3 +272,4 @@ def test_load_all_missing_model_files_raises(tmp_path: Path) -> None:
     manager = BaselineManager()
     with pytest.raises(FileNotFoundError):
         manager.load_all(empty_dir)
+
