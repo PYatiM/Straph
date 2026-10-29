@@ -1,13 +1,17 @@
 """ASGI middleware that emits one APIEventPayload per completed HTTP call.
 
-Privacy: this middleware never reads or logs request or response bodies, and it logs no
-header values. Only metadata (method, route template, ids, status, timestamps) is emitted.
+Privacy: request bodies are never read. A response body is read only for successful POST
+creations whose id is not in the path, solely to pick the configured id field out of a JSON
+object; the body is replayed unchanged to the client and is never logged or emitted. No header
+values are logged. Only metadata (method, route template, ids, status, timestamps) is emitted.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
+from collections.abc import AsyncIterator, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -25,6 +29,7 @@ log = logging.getLogger("straph.gateway.middleware")
 
 SESSION_HEADERS = ("X-Session-Id", "session_id")
 SERVER_ERROR = 500
+CREATED_STATUSES = frozenset({200, 201})
 
 
 def format_timestamp(moment: datetime) -> str:
@@ -60,6 +65,75 @@ def _created_resource_id(response: Response | None, resource_type: str) -> str |
         return None
     loc_type, loc_id = extract_resource_context(location, "GET")
     return loc_id if loc_type == resource_type else None
+
+
+def _id_fields(mapping: Mapping[str, Sequence[str]], resource_type: str) -> Sequence[str]:
+    return mapping.get(resource_type) or mapping.get("default", ("id",))
+
+
+def _pick_id(document: Any, fields: Sequence[str]) -> str | None:
+    """First configured field holding a non-empty string or integer id."""
+    if not isinstance(document, dict):
+        return None
+    for name in fields:
+        value = document.get(name)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            return str(value)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _is_json(response: Response) -> bool:
+    content_type = response.headers.get("content-type", "")
+    return content_type.split(";", 1)[0].strip().lower() == "application/json"
+
+
+async def _peek_json_id(response: Response, fields: Sequence[str], max_bytes: int) -> str | None:
+    """Extract an id from a JSON response body while keeping the stream intact for the client.
+
+    Chunks are buffered up to `max_bytes`; the response iterator is then replaced by one that
+    replays the buffered chunks followed by the rest of the original stream (and re-raises any
+    error hit while peeking), so the caller always receives the complete, unmodified body.
+    """
+    body_iterator = getattr(response, "body_iterator", None)
+    if body_iterator is None or not _is_json(response):
+        return None
+    source = body_iterator.__aiter__()
+    buffered: list[bytes | str] = []
+    size = 0
+    finished = False
+    failure: BaseException | None = None
+    try:
+        async for chunk in source:
+            buffered.append(chunk)
+            size += len(chunk)
+            if size > max_bytes:
+                break
+        else:
+            finished = True
+    except Exception as exc:  # noqa: BLE001 - replayed to the client below, not swallowed
+        failure = exc
+
+    async def replay() -> AsyncIterator[bytes | str]:
+        for chunk in buffered:
+            yield chunk
+        if failure is not None:
+            raise failure
+        if not finished:
+            async for chunk in source:
+                yield chunk
+
+    response.body_iterator = replay()
+    if not finished:
+        return None
+    raw = b"".join(c if isinstance(c, bytes) else c.encode("utf-8") for c in buffered)
+    try:
+        return _pick_id(json.loads(raw), fields)
+    except ValueError:
+        return None
 
 
 class EventInterceptorMiddleware(BaseHTTPMiddleware):
@@ -117,6 +191,17 @@ class EventInterceptorMiddleware(BaseHTTPMiddleware):
             resource_type, resource_id = extract_resource_context(request.url.path, request.method)
             if resource_id is None:
                 resource_id = _created_resource_id(response, resource_type)
+            if (
+                resource_id is None
+                and response is not None
+                and request.method.upper() == "POST"
+                and status_code in CREATED_STATUSES
+            ):
+                resource_id = await _peek_json_id(
+                    response,
+                    _id_fields(self._settings.resource_id_fields, resource_type),
+                    self._settings.resource_id_max_body_bytes,
+                )
             data: dict[str, Any] = {
                 "event_id": str(uuid.uuid4()),
                 "ts_received": format_timestamp(ts_received),
