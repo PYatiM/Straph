@@ -340,3 +340,4 @@ def test_save_and_load_pickle(tmp_path: Path) -> None:
     assert loaded.n == 3
     assert loaded.alpha == 0.02
     assert loaded.get_ngram_counts() == baseline.get_ngram_counts()
+
