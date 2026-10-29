@@ -17,6 +17,7 @@ from services.evaluation.baselines.markov import (
     FirstOrderMarkovBaseline,
 )
 from services.evaluation.baselines.ngram import NGramBaseline
+from services.evaluation.baselines.trace_invariant import TraceInvariantBaseline
 
 __all__ = [
     "END_TOKEN",
@@ -28,6 +29,7 @@ __all__ = [
     "FirstOrderMarkovBaseline",
     "NGramBaseline",
     "SequenceBaselineProtocol",
+    "TraceInvariantBaseline",
     "calibrate_threshold",
     "select_threshold_from_scores",
 ]

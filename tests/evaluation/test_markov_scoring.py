@@ -249,4 +249,3 @@ def test_score_invalid_sequence_structure(invalid_input: Any) -> None:
     baseline.fit([LEGAL_CHECKOUT_FLOW])
     with pytest.raises((TypeError, BaselineValidationError)):
         baseline.score_sequence(invalid_input)
-
