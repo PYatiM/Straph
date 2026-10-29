@@ -1,1 +1,2 @@
 """Detector service tests."""
+
