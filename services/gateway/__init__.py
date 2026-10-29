@@ -7,6 +7,7 @@ from services.gateway.rate_limiter import (
     RateLimiterError,
     RateLimiterProtocol,
     RateLimiterValidationError,
+    RedisFixedWindowRateLimiter,
 )
 
 __all__ = [
@@ -14,5 +15,5 @@ __all__ = [
     "RateLimiterError",
     "RateLimiterProtocol",
     "RateLimiterValidationError",
+    "RedisFixedWindowRateLimiter",
 ]
-
