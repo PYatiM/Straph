@@ -76,7 +76,7 @@ def run_sequence(
 
         instance.event_count += 1
         instance.last_event_id = event["event_id"]
-        if 200 <= event["status"] < 300:
+        if 200 <= event["status_code"] < 300:
             instance.history.append(event)
 
     return alerts

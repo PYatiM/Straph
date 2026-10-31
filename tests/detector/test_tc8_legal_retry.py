@@ -36,7 +36,11 @@ def test_tc8_sequence_structure() -> None:
     ]
     assert len(events) == len(specs)
     for event, (method, path, status) in zip(events, specs, strict=True):
-        assert (event["method"], event["path_template"], event["status"]) == (
+        assert (
+            event["operation"]["method"],
+            event["operation"]["path_template"],
+            event["status_code"],
+        ) == (
             method,
             path,
             status,
@@ -49,8 +53,8 @@ def test_tc8_retry_shares_idempotency_key() -> None:
     events: list[dict[str, Any]] = get_tc8_events()
     failed, retry = events[-2], events[-1]
     assert failed["idempotency_key"] == retry["idempotency_key"] == "idemp-999"
-    assert failed["status"] == 500
-    assert retry["status"] == 200
+    assert failed["status_code"] == 500
+    assert retry["status_code"] == 200
     assert all("idempotency_key" not in e for e in events[:-2])
 
 

@@ -25,38 +25,59 @@ def _event(
         "event_id": f"00000007-0000-4000-8000-{seq:012d}",
         "ts_received": f"2026-10-29T16:{minute:02d}:00.000Z",
         "ts_completed": f"2026-10-29T16:{minute:02d}:00.050Z",
+        "subject": {
+            "issuer": "straph-test",
+            "sub": _USER_A,
+            "role": _USER_A_ROLE,
+        },
         "session_id": session_id,
         "token_id": token_id,
-        "identity": _USER_A,
-        "role": _USER_A_ROLE,
-        "method": method,
-        "path_template": path_template,
+        "operation": {
+            "method": method,
+            "path_template": path_template,
+        },
         "resource_type": "Order",
         "resource_id": _ORDER_ID,
-        "status": status,
+        "status_code": status,
     }
 
 
 def get_tc7_events() -> list[dict[str, Any]]:
     """Return 3 schema-valid events by one identity across two tokens/sessions.
 
-    Sequence for order 1007 (User A is allowed every operation, so only the skip fires):
-    1. POST /orders -> 201                  (token 1, session 1)
-    2. PUT /orders/1007/address -> 200      (token 1, session 1)
-    3. POST /orders/1007/fulfill -> 200     (token 2, session 2; payment+webhook skipped)
+    Sequence for order 1007:
+    1. POST /orders -> 201 (token 1, session 1)
+    2. PUT /orders/1007/address -> 200 (token 1, session 1)
+    3. POST /orders/1007/fulfill -> 200 (token 2, session 2; payment and webhook skipped)
     """
     return [
         _event(1, 0, "POST", "/orders", 201, _TOKEN_1, _SESSION_1),
-        _event(2, 1, "PUT", "/orders/1007/address", 200, _TOKEN_1, _SESSION_1),
-        _event(3, 2, "POST", "/orders/1007/fulfill", 200, _TOKEN_2, _SESSION_2),
+        _event(
+            2,
+            1,
+            "PUT",
+            "/orders/1007/address",
+            200,
+            _TOKEN_1,
+            _SESSION_1,
+        ),
+        _event(
+            3,
+            2,
+            "POST",
+            "/orders/1007/fulfill",
+            200,
+            _TOKEN_2,
+            _SESSION_2,
+        ),
     ]
 
 
 def get_tc7_expected_alerts() -> list[dict[str, Any]]:
     """Return the single expected R2 SKIPPED alert for TC7.
 
-    State is tracked per ``resource_type:resource_id`` (``Order:1007``), not per token or
-    session, so the rotated token on the final event still hits the skipped-payment alert.
+    State is tracked per resource_type:resource_id (Order:1007), not per token or
+    session, so the rotated token on the final event still triggers the skipped-step alert.
     """
     return [
         {
@@ -72,7 +93,10 @@ def get_tc7_expected_alerts() -> list[dict[str, Any]]:
                 "token_id": _TOKEN_2,
                 "session_id": _SESSION_2,
             },
-            "resource": {"type": "Order", "id": _ORDER_ID},
+            "resource": {
+                "type": "Order",
+                "id": _ORDER_ID,
+            },
             "expected_path": [
                 "POST /orders",
                 "PUT /orders/{id}/address",
@@ -85,9 +109,16 @@ def get_tc7_expected_alerts() -> list[dict[str, Any]]:
                 "state": "ADDRESS_SET",
                 "status_code": 200,
             },
-            "missing": ["POST /orders/{id}/payment", "POST /payments/webhook"],
+            "missing": [
+                "POST /orders/{id}/payment",
+                "POST /payments/webhook",
+            ],
             "owasp_class": "BLA6",
-            "flags": {"tainted": True, "late": False, "retry": False},
+            "flags": {
+                "tainted": True,
+                "late": False,
+                "retry": False,
+            },
             "model_version": "checkout-v0",
             "rank_score": None,
         },

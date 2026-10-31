@@ -40,20 +40,28 @@ def test_tc5_sequence_structure() -> None:
     events: list[dict[str, Any]] = get_tc5_events()
     assert len(events) == 2
     create, cancel = events
-    assert (create["identity"], create["role"]) == ("user-alpha", "customer")
-    assert (create["method"], create["path_template"], create["status"]) == (
+    assert (create["subject"]["sub"], create["subject"]["role"]) == ("user-alpha", "customer")
+    assert (
+        create["operation"]["method"],
+        create["operation"]["path_template"],
+        create["status_code"],
+    ) == (
         "POST",
         "/orders",
         201,
     )
-    assert (cancel["identity"], cancel["role"]) == ("user-bravo", "customer")
-    assert (cancel["method"], cancel["path_template"], cancel["status"]) == (
+    assert (cancel["subject"]["sub"], cancel["subject"]["role"]) == ("user-bravo", "customer")
+    assert (
+        cancel["operation"]["method"],
+        cancel["operation"]["path_template"],
+        cancel["status_code"],
+    ) == (
         "POST",
         "/orders/1005/cancel",
         200,
     )
     assert create["resource_id"] == cancel["resource_id"] == "1005"
-    assert create["identity"] != cancel["identity"]
+    assert create["subject"]["sub"] != cancel["subject"]["sub"]
 
 
 @pytest.mark.parametrize("event", get_tc5_events())

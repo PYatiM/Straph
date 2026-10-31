@@ -40,13 +40,13 @@ def test_tc4_sequence_structure() -> None:
     events: list[dict[str, Any]] = get_tc4_events()
     assert len(events) == 10
     assert len({e["event_id"] for e in events}) == len(events)
-    assert events[7]["path_template"] == "/orders/1004/deliver"
+    assert events[7]["operation"]["path_template"] == "/orders/1004/deliver"
     first, second = events[8], events[9]
     for refund in (first, second):
-        assert refund["method"] == "POST"
-        assert refund["path_template"] == "/orders/1004/refund"
-        assert refund["role"] == "support"
-        assert refund["status"] == 200
+        assert refund["operation"]["method"] == "POST"
+        assert refund["operation"]["path_template"] == "/orders/1004/refund"
+        assert refund["subject"]["role"] == "support"
+        assert refund["status_code"] == 200
     assert first["event_id"] != second["event_id"]
 
 

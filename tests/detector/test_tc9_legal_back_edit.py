@@ -34,7 +34,11 @@ def test_tc9_sequence_structure() -> None:
     ]
     assert len(events) == len(specs)
     for event, (method, path, status) in zip(events, specs, strict=True):
-        assert (event["method"], event["path_template"], event["status"]) == (
+        assert (
+            event["operation"]["method"],
+            event["operation"]["path_template"],
+            event["status_code"],
+        ) == (
             method,
             path,
             status,
@@ -47,11 +51,11 @@ def test_tc9_sequence_structure() -> None:
 def test_tc9_address_self_loop_is_repeated_operation() -> None:
     """Assert the last two events are the same operation (self-loop) by the same caller."""
     second, third = get_tc9_events()[1:]
-    assert (second["method"], second["path_template"]) == (
-        third["method"],
-        third["path_template"],
+    assert (second["operation"]["method"], second["operation"]["path_template"]) == (
+        third["operation"]["method"],
+        third["operation"]["path_template"],
     )
-    assert second["identity"] == third["identity"]
+    assert second["subject"]["sub"] == third["subject"]["sub"]
     assert second["event_id"] != third["event_id"]
 
 

@@ -22,15 +22,20 @@ def _event(
         "event_id": f"00000006-0000-4000-8000-{seq:012d}",
         "ts_received": f"2026-10-29T15:{minute:02d}:00.000Z",
         "ts_completed": f"2026-10-29T15:{minute:02d}:00.050Z",
+        "subject": {
+            "issuer": "straph-test",
+            "sub": identity,
+            "role": role,
+        },
         "session_id": f"sess-{identity}",
         "token_id": f"tok-{identity}",
-        "identity": identity,
-        "role": role,
-        "method": method,
-        "path_template": path_template,
+        "operation": {
+            "method": method,
+            "path_template": path_template,
+        },
         "resource_type": resource_type,
         "resource_id": resource_id,
-        "status": status,
+        "status_code": status,
     }
 
 
@@ -42,16 +47,35 @@ def get_tc6_events() -> list[dict[str, Any]]:
     2. POST /orders (user-charlie, customer) -> 201
     3. PUT /orders/1006/address (user-charlie, customer) -> 200
     4. POST /orders/1006/payment (user-charlie, customer) -> 200
-    5. POST /payments/webhook (payment-gateway) -> 200            (state: PAID)
-    6. POST /orders/1006/fulfill (user-charlie, customer) -> 200  (requires "warehouse")
+    5. POST /payments/webhook (payment-gateway) -> 200 (state: PAID)
+    6. POST /orders/1006/fulfill (user-charlie, customer) -> 200 (requires warehouse role)
     """
     c: str = _USER_C
+
     return [
-        _event(1, 0, c, "customer", "POST", "/cart/items", 200, "Cart", "cart-1006"),
+        _event(
+            1,
+            0,
+            c,
+            "customer",
+            "POST",
+            "/cart/items",
+            200,
+            "Cart",
+            "cart-1006",
+        ),
         _event(2, 1, c, "customer", "POST", "/orders", 201),
         _event(3, 2, c, "customer", "PUT", "/orders/1006/address", 200),
         _event(4, 3, c, "customer", "POST", "/orders/1006/payment", 200),
-        _event(5, 4, "payment-gateway", "payment-gateway", "POST", "/payments/webhook", 200),
+        _event(
+            5,
+            4,
+            "payment-gateway",
+            "payment-gateway",
+            "POST",
+            "/payments/webhook",
+            200,
+        ),
         _event(6, 5, c, "customer", "POST", "/orders/1006/fulfill", 200),
     ]
 
@@ -71,8 +95,14 @@ def get_tc6_expected_alerts() -> list[dict[str, Any]]:
             "rule": "R0",
             "secondary_label": "FULFILLED",
             "severity": "accepted",
-            "subject": {"identity": _USER_C, "role": "customer"},
-            "resource": {"type": "Order", "id": _ORDER_ID},
+            "subject": {
+                "identity": _USER_C,
+                "role": "customer",
+            },
+            "resource": {
+                "type": "Order",
+                "id": _ORDER_ID,
+            },
             "expected_path": [
                 "POST /orders",
                 "PUT /orders/{id}/address",
@@ -87,7 +117,11 @@ def get_tc6_expected_alerts() -> list[dict[str, Any]]:
             },
             "missing": [],
             "owasp_class": "BFLA",
-            "flags": {"tainted": True, "late": False, "retry": False},
+            "flags": {
+                "tainted": True,
+                "late": False,
+                "retry": False,
+            },
             "model_version": "checkout-v0",
             "rank_score": None,
         },

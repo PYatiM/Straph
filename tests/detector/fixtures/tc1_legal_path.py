@@ -5,14 +5,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft7Validator
 
 ROOT: Path = Path(__file__).resolve().parents[3]
 EVENT_SCHEMA_PATH: Path = ROOT / "contracts" / "event.schema.json"
 
 
 def get_tc1_events() -> list[dict[str, Any]]:
-    """Return a sequence of 7 schema-valid API events representing a legal checkout path.
+    """Return seven schema-valid API events representing a legal checkout path.
 
     Sequence for order 1001:
     1. POST /cart/items (customer) -> 200
@@ -28,99 +28,134 @@ def get_tc1_events() -> list[dict[str, Any]]:
             "event_id": "00000001-0000-4000-8000-000000000001",
             "ts_received": "2026-10-29T10:00:00.000Z",
             "ts_completed": "2026-10-29T10:00:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "customer-1001",
+                "role": "customer",
+            },
             "session_id": "sess-cust-1001",
             "token_id": "tok-cust-1001",
-            "identity": "customer-1001",
-            "role": "customer",
-            "method": "POST",
-            "path_template": "/cart/items",
+            "operation": {
+                "method": "POST",
+                "path_template": "/cart/items",
+            },
             "resource_type": "Cart",
             "resource_id": "cart-1001",
-            "status": 200,
+            "status_code": 200,
         },
         {
             "event_id": "00000001-0000-4000-8000-000000000002",
             "ts_received": "2026-10-29T10:01:00.000Z",
             "ts_completed": "2026-10-29T10:01:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "customer-1001",
+                "role": "customer",
+            },
             "session_id": "sess-cust-1001",
             "token_id": "tok-cust-1001",
-            "identity": "customer-1001",
-            "role": "customer",
-            "method": "POST",
-            "path_template": "/orders",
+            "operation": {
+                "method": "POST",
+                "path_template": "/orders",
+            },
             "resource_type": "Order",
             "resource_id": "1001",
-            "status": 201,
+            "status_code": 201,
         },
         {
             "event_id": "00000001-0000-4000-8000-000000000003",
             "ts_received": "2026-10-29T10:02:00.000Z",
             "ts_completed": "2026-10-29T10:02:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "customer-1001",
+                "role": "customer",
+            },
             "session_id": "sess-cust-1001",
             "token_id": "tok-cust-1001",
-            "identity": "customer-1001",
-            "role": "customer",
-            "method": "PUT",
-            "path_template": "/orders/1001/address",
+            "operation": {
+                "method": "PUT",
+                "path_template": "/orders/1001/address",
+            },
             "resource_type": "Order",
             "resource_id": "1001",
-            "status": 200,
+            "status_code": 200,
         },
         {
             "event_id": "00000001-0000-4000-8000-000000000004",
             "ts_received": "2026-10-29T10:03:00.000Z",
             "ts_completed": "2026-10-29T10:03:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "customer-1001",
+                "role": "customer",
+            },
             "session_id": "sess-cust-1001",
             "token_id": "tok-cust-1001",
-            "identity": "customer-1001",
-            "role": "customer",
-            "method": "POST",
-            "path_template": "/orders/1001/payment",
+            "operation": {
+                "method": "POST",
+                "path_template": "/orders/1001/payment",
+            },
             "resource_type": "Order",
             "resource_id": "1001",
-            "status": 200,
+            "status_code": 200,
         },
         {
             "event_id": "00000001-0000-4000-8000-000000000005",
             "ts_received": "2026-10-29T10:04:00.000Z",
             "ts_completed": "2026-10-29T10:04:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "payment-gateway",
+                "role": "payment-gateway",
+            },
             "session_id": "sess-webhook-gateway",
             "token_id": "tok-webhook-gateway",
-            "identity": "payment-gateway",
-            "role": "payment-gateway",
-            "method": "POST",
-            "path_template": "/payments/webhook",
+            "operation": {
+                "method": "POST",
+                "path_template": "/payments/webhook",
+            },
             "resource_type": "Order",
             "resource_id": "1001",
-            "status": 200,
+            "status_code": 200,
         },
         {
             "event_id": "00000001-0000-4000-8000-000000000006",
             "ts_received": "2026-10-29T10:05:00.000Z",
             "ts_completed": "2026-10-29T10:05:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "warehouse-worker-1",
+                "role": "warehouse",
+            },
             "session_id": "sess-warehouse-worker",
             "token_id": "tok-warehouse-worker",
-            "identity": "warehouse-worker-1",
-            "role": "warehouse",
-            "method": "POST",
-            "path_template": "/orders/1001/fulfill",
+            "operation": {
+                "method": "POST",
+                "path_template": "/orders/1001/fulfill",
+            },
             "resource_type": "Order",
             "resource_id": "1001",
-            "status": 200,
+            "status_code": 200,
         },
         {
             "event_id": "00000001-0000-4000-8000-000000000007",
             "ts_received": "2026-10-29T10:06:00.000Z",
             "ts_completed": "2026-10-29T10:06:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "warehouse-worker-1",
+                "role": "warehouse",
+            },
             "session_id": "sess-warehouse-worker",
             "token_id": "tok-warehouse-worker",
-            "identity": "warehouse-worker-1",
-            "role": "warehouse",
-            "method": "POST",
-            "path_template": "/orders/1001/ship",
+            "operation": {
+                "method": "POST",
+                "path_template": "/orders/1001/ship",
+            },
             "resource_type": "Order",
             "resource_id": "1001",
-            "status": 200,
+            "status_code": 200,
         },
     ]
 
@@ -132,8 +167,11 @@ def get_tc1_expected_alerts() -> list[dict[str, Any]]:
 
 @pytest.mark.parametrize("event", get_tc1_events())
 def test_each_tc1_event_valid_against_schema(event: dict[str, Any]) -> None:
-    """Validate every TC1 event payload directly against contracts/event.schema.json."""
+    """Validate every TC1 event payload against contracts/event.schema.json."""
     schema: dict[str, Any] = json.loads(EVENT_SCHEMA_PATH.read_text(encoding="utf-8"))
-    validator: Draft202012Validator = Draft202012Validator(schema)
-    errors: list[Any] = list(validator.iter_errors(event))
-    assert errors == [], f"Validation failed for event {event['event_id']}: {errors}"
+    validator = Draft7Validator(schema)
+    errors = list(validator.iter_errors(event))
+
+    assert errors == [], (
+        f"Validation failed for event {event['event_id']}: {[error.message for error in errors]}"
+    )

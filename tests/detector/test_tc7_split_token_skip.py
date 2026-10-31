@@ -45,7 +45,11 @@ def test_tc7_sequence_structure() -> None:
     ]
     assert len(events) == len(specs)
     for event, (method, path, status) in zip(events, specs, strict=True):
-        assert (event["method"], event["path_template"], event["status"]) == (
+        assert (
+            event["operation"]["method"],
+            event["operation"]["path_template"],
+            event["status_code"],
+        ) == (
             method,
             path,
             status,
@@ -60,7 +64,7 @@ def test_tc7_token_and_session_rotate_but_identity_and_object_do_not() -> None:
     assert first["session_id"] == second["session_id"]
     assert third["token_id"] != second["token_id"]
     assert third["session_id"] != second["session_id"]
-    assert {e["identity"] for e in events} == {"user-a"}
+    assert {e["subject"]["sub"] for e in events} == {"user-a"}
     assert {(e["resource_type"], e["resource_id"]) for e in events} == {("Order", "1007")}
 
 

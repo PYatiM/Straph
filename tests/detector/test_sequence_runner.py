@@ -17,8 +17,10 @@ def _dummy_classify(
     instance: InstanceState, event: dict[str, Any], model: dict[str, Any]
 ) -> dict[str, Any] | None:
     """Return None for benign calls; raise AlertRaised if fulfill lacks a prior payment."""
-    if event["path_template"].endswith("/fulfill"):
-        paid: bool = any(e["path_template"].endswith("/payment") for e in instance.history)
+    if event["operation"]["path_template"].endswith("/fulfill"):
+        paid: bool = any(
+            e["operation"]["path_template"].endswith("/payment") for e in instance.history
+        )
         if not paid:
             raise AlertRaised(
                 {
@@ -53,7 +55,7 @@ def test_returned_alert_dicts_are_collected_too() -> None:
     def returning(
         instance: InstanceState, event: dict[str, Any], model: dict[str, Any]
     ) -> dict[str, Any] | None:
-        return {"event_id": event["event_id"]} if event["status"] == 201 else None
+        return {"event_id": event["event_id"]} if event["status_code"] == 201 else None
 
     alerts: list[dict[str, Any]] = run_sequence(MODEL, get_tc1_events(), returning)
     assert len(alerts) == 1
@@ -99,7 +101,7 @@ def test_classifier_can_mutate_instance_state_across_events() -> None:
         instance: InstanceState, event: dict[str, Any], model: dict[str, Any]
     ) -> dict[str, Any] | None:
         states.append(instance.state)
-        instance.state = f"after:{event['path_template']}"
+        instance.state = f"after:{event['operation']['path_template']}"
         return None
 
     run_sequence(MODEL, get_tc2_events(), advancing)
@@ -109,7 +111,7 @@ def test_classifier_can_mutate_instance_state_across_events() -> None:
 def test_only_2xx_events_enter_history() -> None:
     """Assert non-2xx events are counted but not recorded in accepted history."""
     events: list[dict[str, Any]] = [dict(e) for e in get_tc4_events()[:2]]
-    events[1]["status"] = 500
+    events[1]["status_code"] = 500
     events[1]["resource_type"] = events[0]["resource_type"]
     events[1]["resource_id"] = events[0]["resource_id"]
     captured: list[InstanceState] = []

@@ -40,4 +40,3 @@ RULE_ORDER: list[str] = [
     "R2",
     "R3",
 ]
-

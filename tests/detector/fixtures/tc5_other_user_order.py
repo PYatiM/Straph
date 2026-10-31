@@ -8,36 +8,46 @@ def get_tc5_events() -> list[dict[str, Any]]:
 
     Sequence for order 1005:
     1. POST /orders (user-alpha, customer) -> 201
-    2. POST /orders/1005/cancel (user-bravo, customer) -> 200  (not the owner)
+    2. POST /orders/1005/cancel (user-bravo, customer) -> 200 (not the owner)
     """
     return [
         {
             "event_id": "00000005-0000-4000-8000-000000000001",
             "ts_received": "2026-10-29T14:00:00.000Z",
             "ts_completed": "2026-10-29T14:00:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "user-alpha",
+                "role": "customer",
+            },
             "session_id": "sess-user-alpha",
             "token_id": "tok-user-alpha",
-            "identity": "user-alpha",
-            "role": "customer",
-            "method": "POST",
-            "path_template": "/orders",
+            "operation": {
+                "method": "POST",
+                "path_template": "/orders",
+            },
             "resource_type": "Order",
             "resource_id": "1005",
-            "status": 201,
+            "status_code": 201,
         },
         {
             "event_id": "00000005-0000-4000-8000-000000000002",
             "ts_received": "2026-10-29T14:01:00.000Z",
             "ts_completed": "2026-10-29T14:01:00.050Z",
+            "subject": {
+                "issuer": "straph-test",
+                "sub": "user-bravo",
+                "role": "customer",
+            },
             "session_id": "sess-user-bravo",
             "token_id": "tok-user-bravo",
-            "identity": "user-bravo",
-            "role": "customer",
-            "method": "POST",
-            "path_template": "/orders/1005/cancel",
+            "operation": {
+                "method": "POST",
+                "path_template": "/orders/1005/cancel",
+            },
             "resource_type": "Order",
             "resource_id": "1005",
-            "status": 200,
+            "status_code": 200,
         },
     ]
 
@@ -59,7 +69,10 @@ def get_tc5_expected_alerts() -> list[dict[str, Any]]:
             "severity": "accepted",
             "subject": {"sub": "user-bravo"},
             "resource": {"type": "Order", "id": "1005"},
-            "expected_path": ["POST /orders", "POST /orders/{id}/cancel"],
+            "expected_path": [
+                "POST /orders",
+                "POST /orders/{id}/cancel",
+            ],
             "observed": {
                 "operation": "POST /orders/{id}/cancel",
                 "state": "CREATED",
@@ -67,7 +80,11 @@ def get_tc5_expected_alerts() -> list[dict[str, Any]]:
             },
             "missing": [],
             "owasp_class": "BOLA",
-            "flags": {"tainted": True, "late": False, "retry": False},
+            "flags": {
+                "tainted": True,
+                "late": False,
+                "retry": False,
+            },
             "model_version": "checkout-v0",
             "rank_score": None,
         },

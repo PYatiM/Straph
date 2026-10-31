@@ -1,28 +1,57 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "straph/event.schema.json",
   "title": "API event (one per completed call)",
-  "description": "Proposed contract. Emitted by the gateway after the response, so status and created resource ids are known.",
+  "description": "Contract v1. Emitted by the gateway after the response, so status and created resource ids are known. Validation is pattern-based, so it does not depend on a format checker.",
   "type": "object",
-  "required": ["event_id", "ts_completed", "identity", "role", "method", "path_template", "status"],
+  "required": [
+    "event_id", "ts_received", "ts_completed", "subject", "session_id", "token_id",
+    "operation", "resource_type", "resource_id", "status_code"
+  ],
   "additionalProperties": false,
+  "definitions": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+    }
+  },
   "properties": {
-    "event_id": {"type": "string", "minLength": 1},
-    "ts_received": {"type": "string", "format": "date-time"},
-    "ts_completed": {"type": "string", "format": "date-time"},
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "ts_received": {"$ref": "#/definitions/timestamp"},
+    "ts_completed": {"$ref": "#/definitions/timestamp"},
+    "subject": {
+      "type": "object",
+      "required": ["issuer", "sub", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "issuer": {"type": "string", "minLength": 1},
+        "sub": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1}
+      }
+    },
     "session_id": {"type": "string"},
     "token_id": {"type": "string"},
-    "identity": {"type": "string", "minLength": 1},
-    "role": {"type": "string", "minLength": 1},
-    "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]},
-    "path_template": {"type": "string", "pattern": "^/"},
-    "resource_type": {"type": ["string", "null"]},
+    "operation": {
+      "type": "object",
+      "required": ["method", "path_template"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {"enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]},
+        "path_template": {"type": "string", "pattern": "^/"}
+      }
+    },
+    "resource_type": {"type": "string"},
     "resource_id": {"type": ["string", "null"]},
     "idempotency_key": {
       "description": "Optional client-supplied Idempotency-Key. Repeats of an operation sharing a key are retries, not replays.",
-      "type": "string",
+      "type": ["string", "null"],
       "minLength": 1
     },
-    "status": {"type": "integer", "minimum": 100, "maximum": 599}
+    "status_code": {"type": "integer", "minimum": 100, "maximum": 599}
   }
 }

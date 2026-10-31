@@ -35,7 +35,11 @@ def test_tc10_sequence_structure() -> None:
     ]
     assert len(events) == len(specs)
     for event, (method, path, status) in zip(events, specs, strict=True):
-        assert (event["method"], event["path_template"], event["status"]) == (
+        assert (
+            event["operation"]["method"],
+            event["operation"]["path_template"],
+            event["status_code"],
+        ) == (
             method,
             path,
             status,

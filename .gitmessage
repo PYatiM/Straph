@@ -5,3 +5,5 @@
 #
 # Body: what and why (not how). Reference the task id, for example T15.
 # Footer: Refs: T15  |  BREAKING CHANGE: <what contract changed>
+#
+# Assisted-by: <tool/model used, or omit if none>

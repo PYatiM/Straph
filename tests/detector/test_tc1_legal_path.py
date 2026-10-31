@@ -40,11 +40,11 @@ def test_tc1_sequence_structure() -> None:
     ]
 
     for event, (method, path, role, status) in zip(events, expected_specs, strict=True):
-        assert event["method"] == method
-        assert event["path_template"] == path
-        assert event["role"] == role
-        assert event["status"] == status
-        assert event["status"] in {200, 201}
+        assert event["operation"]["method"] == method
+        assert event["operation"]["path_template"] == path
+        assert event["subject"]["role"] == role
+        assert event["status_code"] == status
+        assert event["status_code"] in {200, 201}
 
 
 def test_tc1_expected_alerts_empty() -> None:

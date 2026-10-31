@@ -22,20 +22,25 @@ def _event(
         "event_id": f"00000003-0000-4000-8000-{seq:012d}",
         "ts_received": f"2026-10-29T12:{minute:02d}:00.000Z",
         "ts_completed": f"2026-10-29T12:{minute:02d}:00.050Z",
+        "subject": {
+            "issuer": "straph-test",
+            "sub": identity,
+            "role": role,
+        },
         "session_id": session,
         "token_id": f"tok-{identity}",
-        "identity": identity,
-        "role": role,
-        "method": method,
-        "path_template": path_template,
+        "operation": {
+            "method": method,
+            "path_template": path_template,
+        },
         "resource_type": resource_type,
         "resource_id": resource_id,
-        "status": status,
+        "status_code": status,
     }
 
 
 def get_tc3_events() -> list[dict[str, Any]]:
-    """Return 8 schema-valid events: the TC1 legal path to SHIPPED, then an address edit.
+    """Return 8 schema-valid events: the legal path to SHIPPED, then an address edit.
 
     Sequence for order 1003:
     1. POST /cart/items (customer) -> 200
@@ -44,17 +49,36 @@ def get_tc3_events() -> list[dict[str, Any]]:
     4. POST /orders/1003/payment (customer) -> 200
     5. POST /payments/webhook (payment-gateway) -> 200
     6. POST /orders/1003/fulfill (warehouse) -> 200
-    7. POST /orders/1003/ship (warehouse) -> 200   (state: SHIPPED)
-    8. PUT /orders/1003/address (customer) -> 200  (out of order, accepted)
+    7. POST /orders/1003/ship (warehouse) -> 200 (state: SHIPPED)
+    8. PUT /orders/1003/address (customer) -> 200 (out of order, accepted)
     """
     cust: str = "customer-1003"
     wh: str = "warehouse-worker-1"
+
     return [
-        _event(1, 0, cust, "customer", "POST", "/cart/items", 200, "Cart", "cart-1003"),
+        _event(
+            1,
+            0,
+            cust,
+            "customer",
+            "POST",
+            "/cart/items",
+            200,
+            "Cart",
+            "cart-1003",
+        ),
         _event(2, 1, cust, "customer", "POST", "/orders", 201),
         _event(3, 2, cust, "customer", "PUT", "/orders/1003/address", 200),
         _event(4, 3, cust, "customer", "POST", "/orders/1003/payment", 200),
-        _event(5, 4, "payment-gateway", "payment-gateway", "POST", "/payments/webhook", 200),
+        _event(
+            5,
+            4,
+            "payment-gateway",
+            "payment-gateway",
+            "POST",
+            "/payments/webhook",
+            200,
+        ),
         _event(6, 5, wh, "warehouse", "POST", "/orders/1003/fulfill", 200),
         _event(7, 6, wh, "warehouse", "POST", "/orders/1003/ship", 200),
         _event(8, 7, cust, "customer", "PUT", "/orders/1003/address", 200),
@@ -62,7 +86,7 @@ def get_tc3_events() -> list[dict[str, Any]]:
 
 
 def get_tc3_expected_alerts() -> list[dict[str, Any]]:
-    """Return the single expected R3 OUT_OF_ORDER alert (accepted, tainted) for TC3."""
+    """Return the expected R3 OUT_OF_ORDER alert (accepted, tainted) for TC3."""
     return [
         {
             "alert_id": "00000003-0000-4000-8000-0000000000a1",
@@ -71,8 +95,14 @@ def get_tc3_expected_alerts() -> list[dict[str, Any]]:
             "label": "OUT_OF_ORDER",
             "rule": "R3",
             "severity": "accepted",
-            "subject": {"identity": "customer-1003", "role": "customer"},
-            "resource": {"type": "Order", "id": _ORDER_ID},
+            "subject": {
+                "identity": "customer-1003",
+                "role": "customer",
+            },
+            "resource": {
+                "type": "Order",
+                "id": _ORDER_ID,
+            },
             "expected_path": [
                 "POST /orders",
                 "PUT /orders/{id}/address",
@@ -88,7 +118,11 @@ def get_tc3_expected_alerts() -> list[dict[str, Any]]:
             },
             "missing": [],
             "owasp_class": "BLA6",
-            "flags": {"tainted": True, "late": False, "retry": False},
+            "flags": {
+                "tainted": True,
+                "late": False,
+                "retry": False,
+            },
             "model_version": "checkout-v0",
             "rank_score": None,
         },

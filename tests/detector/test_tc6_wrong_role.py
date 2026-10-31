@@ -39,13 +39,13 @@ def test_tc6_sequence_structure() -> None:
     """Assert order 1006 reaches PAID, then a customer calls warehouse-only fulfill."""
     events: list[dict[str, Any]] = get_tc6_events()
     assert len(events) == 6
-    assert events[4]["path_template"] == "/payments/webhook"
+    assert events[4]["operation"]["path_template"] == "/payments/webhook"
     final: dict[str, Any] = events[-1]
-    assert final["method"] == "POST"
-    assert final["path_template"] == "/orders/1006/fulfill"
-    assert final["role"] == "customer"
-    assert final["role"] != "warehouse"
-    assert final["status"] == 200
+    assert final["operation"]["method"] == "POST"
+    assert final["operation"]["path_template"] == "/orders/1006/fulfill"
+    assert final["subject"]["role"] == "customer"
+    assert final["subject"]["role"] != "warehouse"
+    assert final["status_code"] == 200
     assert len({e["event_id"] for e in events}) == len(events)
 
 

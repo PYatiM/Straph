@@ -1,18 +1,38 @@
 {
-  "model_version": "checkout-v0",
-  "workflow": "Order",
-  "start_state": "S0",
-  "states": [{"id": "S0"}, {"id": "S1"}, {"id": "S2"}, {"id": "S3", "terminal": true}, {"id": "S4", "terminal": true}],
-  "operations": [
-    {"id": "create", "method": "POST", "path_template": "/orders", "one_shot": true, "allowed_roles": ["customer"]},
-    {"id": "pay", "method": "POST", "path_template": "/orders/{id}/payment", "one_shot": true, "allowed_roles": ["customer"]},
-    {"id": "confirm", "method": "POST", "path_template": "/orders/{id}/confirm", "one_shot": true, "allowed_roles": ["customer"]},
-    {"id": "cancel", "method": "POST", "path_template": "/orders/{id}/cancel", "one_shot": false, "allowed_roles": ["customer"]}
+  "model_version": "9fceb02d41@2026-10-13T09:00:00Z",
+  "resource_type": "Order",
+  "initial_state": "S0",
+  "states": [
+    {"state_id": "S0", "terminal": false, "description": "No order exists yet"},
+    {"state_id": "S1", "terminal": false, "description": "Order created, awaiting payment"},
+    {"state_id": "S2", "terminal": false, "description": "Order paid, awaiting confirmation"},
+    {"state_id": "S3", "terminal": true, "description": "Order confirmed"},
+    {"state_id": "S4", "terminal": true, "description": "Order cancelled"}
   ],
   "transitions": [
-    {"id": "T1", "operation": "create", "from": ["S0"], "to": "S1", "provenance": "spec"},
-    {"id": "T2", "operation": "pay", "from": ["S1"], "to": "S2", "provenance": "spec"},
-    {"id": "T3", "operation": "confirm", "from": ["S2"], "to": "S3", "provenance": "spec"},
-    {"id": "T4", "operation": "cancel", "from": ["S1", "S2"], "to": "S4", "provenance": "spec"}
+    {
+      "transition_id": "T1",
+      "operation": {"method": "POST", "path_template": "/orders"},
+      "from_states": ["S0"], "to_state": "S1", "allowed_roles": ["customer"],
+      "single_use": true, "provenance": "spec", "support_count": 0, "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T2",
+      "operation": {"method": "POST", "path_template": "/orders/{id}/payment"},
+      "from_states": ["S1"], "to_state": "S2", "allowed_roles": ["customer"],
+      "single_use": true, "provenance": "both", "support_count": 120, "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T3",
+      "operation": {"method": "POST", "path_template": "/orders/{id}/confirm"},
+      "from_states": ["S2"], "to_state": "S3", "allowed_roles": ["customer"],
+      "single_use": true, "provenance": "spec", "support_count": 0, "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T4",
+      "operation": {"method": "POST", "path_template": "/orders/{id}/cancel"},
+      "from_states": ["S1", "S2"], "to_state": "S4", "allowed_roles": ["customer", "support"],
+      "single_use": false, "provenance": "trace", "support_count": 7, "review_status": "candidate"
+    }
   ]
 }

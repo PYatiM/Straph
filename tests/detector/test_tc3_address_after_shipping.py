@@ -50,10 +50,10 @@ def test_tc3_sequence_structure() -> None:
     ]
     assert len(events) == len(specs)
     for event, (method, path, role, status) in zip(events, specs, strict=True):
-        assert event["method"] == method
-        assert event["path_template"] == path
-        assert event["role"] == role
-        assert event["status"] == status
+        assert event["operation"]["method"] == method
+        assert event["operation"]["path_template"] == path
+        assert event["subject"]["role"] == role
+        assert event["status_code"] == status
     assert len({e["event_id"] for e in events}) == len(events)
 
 

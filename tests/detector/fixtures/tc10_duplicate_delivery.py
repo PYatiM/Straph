@@ -10,15 +10,20 @@ def _event(seq: int, minute: int, method: str, path_template: str, status: int) 
         "event_id": f"00000010-0000-4000-8000-{seq:012d}",
         "ts_received": f"2026-10-29T19:{minute:02d}:00.000Z",
         "ts_completed": f"2026-10-29T19:{minute:02d}:00.050Z",
+        "subject": {
+            "issuer": "straph-test",
+            "sub": "customer-1010",
+            "role": "customer",
+        },
         "session_id": "sess-cust-1010",
         "token_id": "tok-cust-1010",
-        "identity": "customer-1010",
-        "role": "customer",
-        "method": method,
-        "path_template": path_template,
+        "operation": {
+            "method": method,
+            "path_template": path_template,
+        },
         "resource_type": "Order",
         "resource_id": "1010",
-        "status": status,
+        "status_code": status,
     }
 
 
