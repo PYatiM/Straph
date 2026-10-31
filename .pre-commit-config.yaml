@@ -6,3 +6,14 @@ repos:
         entry: ruff check
         language: system
         types: [python]
+      - id: ruff-format
+        name: ruff-format
+        entry: ruff format --check
+        language: system
+        types: [python]
+      - id: pytest
+        name: pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
