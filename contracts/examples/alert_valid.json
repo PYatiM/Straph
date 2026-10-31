@@ -1,1 +1,37 @@
-{"alert_id": "a-0001", "event_id": "e-000150", "label": "SKIPPED", "rule": "R2", "severity": "accepted", "subject": "user-1842", "resource_type": "Order", "resource_id": "5521", "expected_path": ["create", "pay", "confirm"], "observed": {"operation": "confirm", "state": "S1", "status": 200}, "missing": ["pay"], "owasp_class": "BLA6", "flags": {"tainted": true, "late": false, "retry": false}, "model_version": "checkout-v0", "rank_score": null}
+{
+  "alert_id": "4b6e50e8-0797-4d7a-b9c7-5f72e61cbb11",
+  "event_id": "9d36a962-d9fa-48ef-bf46-f949c20fbf28",
+  "timestamp": "2026-10-29T12:00:00Z",
+  "label": "SKIPPED",
+  "rule": "R2",
+  "severity": "accepted",
+  "subject": {
+    "identity": "user-1842",
+    "role": "customer"
+  },
+  "resource": {
+    "type": "Order",
+    "id": "5521"
+  },
+  "expected_path": [
+    "create",
+    "pay",
+    "confirm"
+  ],
+  "observed": {
+    "operation": "confirm",
+    "state": "S1",
+    "status_code": 200
+  },
+  "missing": [
+    "pay"
+  ],
+  "owasp_class": "BLA6",
+  "flags": {
+    "tainted": true,
+    "late": false,
+    "retry": false
+  },
+  "model_version": "checkout-v0",
+  "rank_score": null
+}

@@ -1,0 +1,19 @@
+{
+  "event_id": "not-a-valid-uuid",
+  "ts_received": "not-a-timestamp",
+  "ts_completed": "2026-10-31T10:00:01Z",
+  "subject": {
+    "issuer": "straph-auth",
+    "sub": "user-123",
+    "role": "customer"
+  },
+  "session_id": "session-abc123",
+  "token_id": "token-xyz789",
+  "operation": {
+    "method": "INVALID",
+    "path_template": "/orders/{order_id}/fulfill"
+  },
+  "resource_type": "order",
+  "resource_id": "order-1005",
+  "status_code": 700
+}

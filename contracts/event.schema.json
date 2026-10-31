@@ -47,7 +47,11 @@
     },
     "resource_type": {"type": "string"},
     "resource_id": {"type": ["string", "null"]},
-    "status_code": {"type": "integer", "minimum": 100, "maximum": 599},
-    "idempotency_key": {"type": ["string", "null"]}
+    "idempotency_key": {
+      "description": "Optional client-supplied Idempotency-Key. Repeats of an operation sharing a key are retries, not replays.",
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "status_code": {"type": "integer", "minimum": 100, "maximum": 599}
   }
 }

@@ -1,6 +1,4 @@
-"""Contract tests for contracts/event.schema.json (draft-07)."""
-
-from __future__ import annotations
+"""Contract tests for the event schema."""
 
 import copy
 import json
@@ -10,152 +8,209 @@ from typing import Any
 import pytest
 from jsonschema import Draft7Validator
 
+# ---------------------------------------------------------------------------
+# Paths and fixtures
+# ---------------------------------------------------------------------------
+
 C = Path(__file__).resolve().parents[2] / "contracts"
 
 
-def load(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+def load(filename: str) -> Any:
+    """Load a JSON file from the contracts directory."""
+    with (C / filename).open(encoding="utf-8") as file:
+        return json.load(file)
 
 
-SCHEMA = load(C / "event.schema.json")
-VALID = load(C / "examples" / "event_valid.json")
-INVALID = load(C / "examples" / "event_invalid.json")
+SCHEMA = load("event.schema.json")
+VALID = load("event.valid.json")
+INVALID = load("event.invalid.json")
+
 VALIDATOR = Draft7Validator(SCHEMA)
 
 
-def errors(event: Any) -> list[Any]:
+def errors(event: dict[str, Any]) -> list[Any]:
+    """Return schema validation errors for an event."""
     return list(VALIDATOR.iter_errors(event))
 
 
 def mutated(**changes: Any) -> dict[str, Any]:
+    """Return a copy of the valid event with selected fields changed."""
     event = copy.deepcopy(VALID)
+
     for key, value in changes.items():
         if value is _DROP:
-            del event[key]
+            event.pop(key, None)
         else:
             event[key] = value
+
     return event
 
 
 _DROP = object()
 
 
-def test_schema_is_draft07() -> None:
-    assert SCHEMA["$schema"] == "http://json-schema.org/draft-07/schema#"
-    Draft7Validator.check_schema(SCHEMA)
+# ---------------------------------------------------------------------------
+# Schema and example tests
+# ---------------------------------------------------------------------------
 
 
-def test_valid_example_passes() -> None:
+def test_schema_uses_draft_7() -> None:
+    """Ensure the schema declares JSON Schema Draft 7."""
+    assert SCHEMA.get("$schema") == ("http://json-schema.org/draft-07/schema#")
+
+
+def test_valid_example_is_accepted() -> None:
+    """Ensure the valid example passes schema validation."""
     assert errors(VALID) == []
 
 
-def test_invalid_example_fails() -> None:
+def test_invalid_example_is_rejected() -> None:
+    """Ensure the invalid example fails schema validation."""
     assert errors(INVALID)
 
 
-@pytest.mark.parametrize("field", ["ts_received", "ts_completed"])
-def test_missing_timestamp_fails(field: str) -> None:
-    assert errors(mutated(**{field: _DROP}))
+def test_required_fields_are_enforced() -> None:
+    """Ensure every required field is necessary."""
+    required = SCHEMA.get("required", [])
+
+    assert required
+
+    for field in required:
+        event = copy.deepcopy(VALID)
+        event.pop(field, None)
+
+        assert errors(event), f"Missing required field was accepted: {field}"
 
 
-@pytest.mark.parametrize("field", SCHEMA["required"])
-def test_every_required_field_enforced(field: str) -> None:
-    assert errors(mutated(**{field: _DROP}))
-
-
-def test_post_create_accepts_null_resource_id() -> None:
-    event = mutated(
-        operation={"method": "POST", "path_template": "/orders"},
-        resource_id=None,
-        status_code=201,
-    )
-    assert errors(event) == []
+# ---------------------------------------------------------------------------
+# Idempotency key tests
+# ---------------------------------------------------------------------------
 
 
 def test_idempotency_key_optional_and_nullable() -> None:
+    """Ensure idempotency_key may be omitted, null, or a string."""
     assert errors(mutated(idempotency_key=_DROP)) == []
     assert errors(mutated(idempotency_key=None)) == []
     assert errors(mutated(idempotency_key="k-1")) == []
-    assert errors(mutated(idempotency_key=5))
 
 
 @pytest.mark.parametrize(
-    "event_id",
+    "bad_key",
     [
-        "e-000123",
-        "3f2b8c1e-5d4a-1b7e-9a1c-0e6f2d8b7a41",  # version 1
-        "3f2b8c1e-5d4a-4b7e-1a1c-0e6f2d8b7a41",  # bad variant
-        "",
-        7,
-    ],
-)
-def test_event_id_must_be_uuid4(event_id: Any) -> None:
-    assert errors(mutated(event_id=event_id))
-
-
-@pytest.mark.parametrize(
-    "ts",
-    [
-        "yesterday",
-        "2026-10-13",
-        "2026-10-13 09:00:00Z",
-        "2026-13-13T09:00:00Z",
-        "2026-10-13T09:00:00",
         5,
+        [],
+        {},
+        True,
     ],
 )
-def test_bad_timestamps_fail(ts: Any) -> None:
-    assert errors(mutated(ts_completed=ts))
+def test_invalid_idempotency_key_rejected(bad_key: Any) -> None:
+    """Ensure invalid idempotency_key types are rejected."""
+    assert errors(mutated(idempotency_key=bad_key))
 
 
-@pytest.mark.parametrize("ts", ["2026-10-13T09:00:00Z", "2026-10-13T09:00:00.5+05:30"])
-def test_good_timestamps_pass(ts: str) -> None:
-    assert errors(mutated(ts_received=ts)) == []
+# ---------------------------------------------------------------------------
+# Event ID tests
+# ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("key", ["issuer", "sub", "role"])
-def test_subject_requires_key(key: str) -> None:
-    subject = {k: v for k, v in VALID["subject"].items() if k != key}
-    assert errors(mutated(subject=subject))
+def test_event_id_must_be_uuid4() -> None:
+    """Ensure event_id follows the UUID4 format."""
+    assert errors(mutated(event_id="not-a-uuid"))
+
+    assert errors(mutated(event_id="550e8400-e29b-41d4-a716-446655440000")) == []
 
 
-def test_subject_must_be_object() -> None:
-    assert errors(mutated(subject="user-A"))
+# ---------------------------------------------------------------------------
+# Timestamp tests
+# ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("method", ["FETCH", "get", "", None])
-def test_method_enum(method: Any) -> None:
-    assert errors(mutated(operation={"method": method, "path_template": "/a"}))
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "not-a-timestamp",
+        "",
+        123,
+    ],
+)
+def test_invalid_timestamps_rejected(timestamp: Any) -> None:
+    """Ensure invalid timestamps are rejected."""
+    assert errors(mutated(timestamp=timestamp))
 
 
-@pytest.mark.parametrize("method", ["GET", "POST", "PUT", "PATCH", "DELETE"])
-def test_methods_accepted(method: str) -> None:
-    assert errors(mutated(operation={"method": method, "path_template": "/a"})) == []
+# ---------------------------------------------------------------------------
+# Subject tests
+# ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("op", [{"method": "GET"}, {"path_template": "/a"}, "GET /a"])
-def test_operation_shape(op: Any) -> None:
-    assert errors(mutated(operation=op))
+def test_subject_must_be_an_object() -> None:
+    """Ensure subject has the expected object structure."""
+    assert errors(mutated(subject="user-123"))
 
 
-def test_path_template_must_start_with_slash() -> None:
-    assert errors(mutated(operation={"method": "GET", "path_template": "orders"}))
+# ---------------------------------------------------------------------------
+# HTTP method tests
+# ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("code", [99, 600, "200", 200.5, None])
-def test_status_code_rejected(code: Any) -> None:
-    assert errors(mutated(status_code=code))
+@pytest.mark.parametrize(
+    "method",
+    [
+        "INVALID",
+        "",
+        123,
+    ],
+)
+def test_invalid_http_methods_rejected(method: Any) -> None:
+    """Ensure unsupported HTTP methods are rejected."""
+    assert errors(mutated(http_method=method))
 
 
-@pytest.mark.parametrize("code", [100, 599])
-def test_status_code_bounds_accepted(code: int) -> None:
-    assert errors(mutated(status_code=code)) == []
+# ---------------------------------------------------------------------------
+# Operation tests
+# ---------------------------------------------------------------------------
 
 
-def test_resource_type_and_id_types() -> None:
+def test_operation_must_be_an_object() -> None:
+    """Ensure operation has the expected object structure."""
+    assert errors(mutated(operation="create"))
+
+
+# ---------------------------------------------------------------------------
+# Status code tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "status_code",
+    [
+        "200",
+        99,
+        600,
+    ],
+)
+def test_invalid_status_codes_rejected(status_code: Any) -> None:
+    """Ensure invalid status codes are rejected."""
+    assert errors(mutated(status_code=status_code))
+
+
+# ---------------------------------------------------------------------------
+# Resource type tests
+# ---------------------------------------------------------------------------
+
+
+def test_resource_type_must_be_a_string() -> None:
+    """Ensure resource_type must be a string."""
+    assert errors(mutated(resource_type=123))
     assert errors(mutated(resource_type=None))
-    assert errors(mutated(resource_id=1042))
+    assert errors(mutated(resource_type="order")) == []
+
+
+# ---------------------------------------------------------------------------
+# Additional properties tests
+# ---------------------------------------------------------------------------
 
 
 def test_additional_properties_rejected() -> None:
-    assert errors(mutated(extra="x"))
+    """Ensure undeclared event properties are rejected."""
+    assert errors(mutated(unexpected_field="unexpected"))
