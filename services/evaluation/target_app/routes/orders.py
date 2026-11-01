@@ -104,6 +104,7 @@ Carts = Annotated[CartStore, Depends(get_cart_store)]
 
 ROLE_PAYMENT_GATEWAY = "payment-gateway"
 ROLE_WAREHOUSE = "warehouse"
+ROLE_CARRIER = "carrier"
 
 
 def require_role(role: str) -> Callable[[str, frozenset[str]], str]:
@@ -119,6 +120,7 @@ def require_role(role: str) -> Callable[[str, frozenset[str]], str]:
 
 GatewaySub = Annotated[str, Depends(require_role(ROLE_PAYMENT_GATEWAY))]
 WarehouseSub = Annotated[str, Depends(require_role(ROLE_WAREHOUSE))]
+CarrierSub = Annotated[str, Depends(require_role(ROLE_CARRIER))]
 
 
 def _cart_response(cart: CartSummary) -> CartSummaryResponse:
@@ -221,3 +223,13 @@ def payment_webhook(
 @router.post("/orders/{order_id}/fulfill", response_model=OrderStateResponse)
 def fulfill_order(order_id: str, sub: WarehouseSub, repository: Repository) -> OrderStateResponse:
     return _advance_by_role(repository, order_id, OrderState.FULFILLMENT_QUEUED, sub)
+
+
+@router.post("/orders/{order_id}/ship", response_model=OrderStateResponse)
+def ship_order(order_id: str, sub: WarehouseSub, repository: Repository) -> OrderStateResponse:
+    return _advance_by_role(repository, order_id, OrderState.SHIPPED, sub)
+
+
+@router.post("/orders/{order_id}/deliver", response_model=OrderStateResponse)
+def deliver_order(order_id: str, sub: CarrierSub, repository: Repository) -> OrderStateResponse:
+    return _advance_by_role(repository, order_id, OrderState.DELIVERED, sub)
