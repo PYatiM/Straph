@@ -68,6 +68,12 @@ class OrderStateResponse(BaseModel):
     state: str
 
 
+class RefundResponse(BaseModel):
+    order_id: str
+    state: str
+    refunded: bool
+
+
 def get_caller_sub(
     x_user_sub: Annotated[str | None, Header()] = None,
 ) -> str:
@@ -105,6 +111,7 @@ Carts = Annotated[CartStore, Depends(get_cart_store)]
 ROLE_PAYMENT_GATEWAY = "payment-gateway"
 ROLE_WAREHOUSE = "warehouse"
 ROLE_CARRIER = "carrier"
+ROLE_SUPPORT = "support"
 
 
 def require_role(role: str) -> Callable[[str, frozenset[str]], str]:
@@ -121,6 +128,7 @@ def require_role(role: str) -> Callable[[str, frozenset[str]], str]:
 GatewaySub = Annotated[str, Depends(require_role(ROLE_PAYMENT_GATEWAY))]
 WarehouseSub = Annotated[str, Depends(require_role(ROLE_WAREHOUSE))]
 CarrierSub = Annotated[str, Depends(require_role(ROLE_CARRIER))]
+SupportSub = Annotated[str, Depends(require_role(ROLE_SUPPORT))]
 
 
 def _cart_response(cart: CartSummary) -> CartSummaryResponse:
@@ -233,3 +241,20 @@ def ship_order(order_id: str, sub: WarehouseSub, repository: Repository) -> Orde
 @router.post("/orders/{order_id}/deliver", response_model=OrderStateResponse)
 def deliver_order(order_id: str, sub: CarrierSub, repository: Repository) -> OrderStateResponse:
     return _advance_by_role(repository, order_id, OrderState.DELIVERED, sub)
+
+
+@router.post("/orders/{order_id}/cancel", response_model=OrderStateResponse)
+def cancel_order(order_id: str, sub: CallerSub, repository: Repository) -> OrderStateResponse:
+    _load_owned_order(repository, order_id, sub)
+    try:
+        order = repository.update_order_state(order_id, OrderState.CANCELLED, sub)
+    except InvalidStateTransitionException as exc:
+        raise _invalid_state(exc) from None
+    return OrderStateResponse(order_id=order.order_id, state=order.state.value)
+
+
+@router.post("/orders/{order_id}/refund", response_model=RefundResponse)
+def refund_order(order_id: str, sub: SupportSub, repository: Repository) -> RefundResponse:
+    result = _advance_by_role(repository, order_id, OrderState.REFUNDED, sub)
+    refunded = repository.get_order(order_id).refunded
+    return RefundResponse(order_id=result.order_id, state=result.state, refunded=refunded)
