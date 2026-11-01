@@ -86,13 +86,13 @@ def test_get_order_unknown_id_raises(repo: OrderRepository) -> None:
 
 def test_update_unknown_order_raises(repo: OrderRepository) -> None:
     with pytest.raises(OrderNotFoundException):
-        repo.update_order_state("missing", OrderState.ORDER_ADDRESS_SET, "alice")
+        repo.update_order_state("missing", OrderState.ADDRESS_SET, "alice")
 
 
 def test_snapshots_are_immutable(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
     with pytest.raises(AttributeError):
-        order.state = OrderState.ORDER_PAID  # type: ignore[misc]
+        order.state = OrderState.PAID  # type: ignore[misc]
 
 
 # --- legal transitions ------------------------------------------------------------------
@@ -103,25 +103,27 @@ def test_full_happy_path(repo: OrderRepository) -> None:
     _advance(
         repo,
         order.order_id,
-        OrderState.ORDER_ADDRESS_SET,
-        OrderState.ORDER_PAID,
-        OrderState.ORDER_SHIPPED,
-        OrderState.ORDER_DELIVERED,
+        OrderState.ADDRESS_SET,
+        OrderState.PAYMENT_PENDING,
+        OrderState.PAID,
+        OrderState.SHIPPED,
+        OrderState.DELIVERED,
     )
     final = repo.get_order(order.order_id)
-    assert final.state is OrderState.ORDER_DELIVERED
+    assert final.state is OrderState.DELIVERED
     assert [h.to_state for h in final.history] == [
         OrderState.ORDER_CREATED,
-        OrderState.ORDER_ADDRESS_SET,
-        OrderState.ORDER_PAID,
-        OrderState.ORDER_SHIPPED,
-        OrderState.ORDER_DELIVERED,
+        OrderState.ADDRESS_SET,
+        OrderState.PAYMENT_PENDING,
+        OrderState.PAID,
+        OrderState.SHIPPED,
+        OrderState.DELIVERED,
     ]
 
 
 def test_update_records_actor_and_previous_state(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
-    repo.update_order_state(order.order_id, OrderState.ORDER_ADDRESS_SET, "bob")
+    repo.update_order_state(order.order_id, OrderState.ADDRESS_SET, "bob")
     entry = repo.get_order(order.order_id).history[-1]
     assert entry.actor_sub == "bob"
     assert entry.from_state is OrderState.ORDER_CREATED
@@ -129,10 +131,8 @@ def test_update_records_actor_and_previous_state(repo: OrderRepository) -> None:
 
 def test_update_attaches_address_and_payment(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
-    repo.update_order_state(
-        order.order_id, OrderState.ORDER_ADDRESS_SET, "alice", address="1 Main St"
-    )
-    repo.update_order_state(order.order_id, OrderState.ORDER_PAID, "alice", payment_id="pay_1")
+    repo.update_order_state(order.order_id, OrderState.ADDRESS_SET, "alice", address="1 Main St")
+    repo.update_order_state(order.order_id, OrderState.PAYMENT_PENDING, "alice", payment_id="pay_1")
     final = repo.get_order(order.order_id)
     assert final.address == "1 Main St"
     assert final.payment_id == "pay_1"
@@ -143,9 +143,10 @@ def test_refund_sets_refunded_flag(repo: OrderRepository) -> None:
     _advance(
         repo,
         order.order_id,
-        OrderState.ORDER_ADDRESS_SET,
-        OrderState.ORDER_PAID,
-        OrderState.ORDER_REFUNDED,
+        OrderState.ADDRESS_SET,
+        OrderState.PAYMENT_PENDING,
+        OrderState.PAID,
+        OrderState.REFUNDED,
     )
     assert repo.get_order(order.order_id).refunded is True
 
@@ -156,32 +157,44 @@ def test_refund_sets_refunded_flag(repo: OrderRepository) -> None:
 def test_skipping_states_is_rejected(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
     with pytest.raises(InvalidStateTransitionException) as exc:
-        repo.update_order_state(order.order_id, OrderState.ORDER_SHIPPED, "alice")
+        repo.update_order_state(order.order_id, OrderState.SHIPPED, "alice")
     assert exc.value.current is OrderState.ORDER_CREATED
-    assert exc.value.requested is OrderState.ORDER_SHIPPED
+    assert exc.value.requested is OrderState.SHIPPED
 
 
 def test_replaying_a_step_is_rejected(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
-    _advance(repo, order.order_id, OrderState.ORDER_ADDRESS_SET, OrderState.ORDER_PAID)
+    _advance(
+        repo,
+        order.order_id,
+        OrderState.ADDRESS_SET,
+        OrderState.PAYMENT_PENDING,
+        OrderState.PAID,
+    )
     with pytest.raises(InvalidStateTransitionException):
-        repo.update_order_state(order.order_id, OrderState.ORDER_PAID, "alice")
+        repo.update_order_state(order.order_id, OrderState.PAID, "alice")
 
 
 def test_going_backwards_is_rejected(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
-    _advance(repo, order.order_id, OrderState.ORDER_ADDRESS_SET, OrderState.ORDER_PAID)
+    _advance(
+        repo,
+        order.order_id,
+        OrderState.ADDRESS_SET,
+        OrderState.PAYMENT_PENDING,
+        OrderState.PAID,
+    )
     with pytest.raises(InvalidStateTransitionException):
-        repo.update_order_state(order.order_id, OrderState.ORDER_ADDRESS_SET, "alice")
+        repo.update_order_state(order.order_id, OrderState.ADDRESS_SET, "alice")
 
 
 def test_refund_before_payment_is_rejected(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
     with pytest.raises(InvalidStateTransitionException):
-        repo.update_order_state(order.order_id, OrderState.ORDER_REFUNDED, "alice")
+        repo.update_order_state(order.order_id, OrderState.REFUNDED, "alice")
 
 
-@pytest.mark.parametrize("terminal", [OrderState.ORDER_CANCELLED, OrderState.ORDER_REFUNDED])
+@pytest.mark.parametrize("terminal", [OrderState.CANCELLED, OrderState.REFUNDED])
 def test_terminal_states_have_no_exits(terminal: OrderState) -> None:
     assert ALLOWED_TRANSITIONS[terminal] == frozenset()
 
@@ -189,7 +202,7 @@ def test_terminal_states_have_no_exits(terminal: OrderState) -> None:
 def test_rejected_move_leaves_order_unchanged(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
     with pytest.raises(InvalidStateTransitionException):
-        repo.update_order_state(order.order_id, OrderState.ORDER_DELIVERED, "alice")
+        repo.update_order_state(order.order_id, OrderState.DELIVERED, "alice")
     after = repo.get_order(order.order_id)
     assert after.state is OrderState.ORDER_CREATED
     assert len(after.history) == 1
@@ -199,14 +212,26 @@ def test_every_state_has_a_transition_entry() -> None:
     assert set(ALLOWED_TRANSITIONS) == set(OrderState)
 
 
+def test_address_can_be_edited_again_before_payment(repo: OrderRepository) -> None:
+    order = repo.create_order("alice", ITEMS)
+    _advance(repo, order.order_id, OrderState.ADDRESS_SET, OrderState.ADDRESS_SET)
+    assert repo.get_order(order.order_id).state is OrderState.ADDRESS_SET
+
+
+def test_payment_pending_requires_address_first(repo: OrderRepository) -> None:
+    order = repo.create_order("alice", ITEMS)
+    with pytest.raises(InvalidStateTransitionException):
+        repo.update_order_state(order.order_id, OrderState.PAYMENT_PENDING, "alice")
+
+
 # --- non-strict mode --------------------------------------------------------------------
 
 
 def test_non_strict_mode_allows_illegal_move() -> None:
     repo = OrderRepository(strict=False)
     order = repo.create_order("alice", ITEMS)
-    updated = repo.update_order_state(order.order_id, OrderState.ORDER_SHIPPED, "mallory")
-    assert updated.state is OrderState.ORDER_SHIPPED
+    updated = repo.update_order_state(order.order_id, OrderState.SHIPPED, "mallory")
+    assert updated.state is OrderState.SHIPPED
 
 
 # --- concurrency ------------------------------------------------------------------------
@@ -221,7 +246,7 @@ def test_concurrent_updates_allow_exactly_one_winner(repo: OrderRepository) -> N
     def worker() -> None:
         barrier.wait()
         try:
-            repo.update_order_state(order.order_id, OrderState.ORDER_ADDRESS_SET, "alice")
+            repo.update_order_state(order.order_id, OrderState.CANCELLED, "alice")
             outcome = "ok"
         except InvalidStateTransitionException:
             outcome = "rejected"

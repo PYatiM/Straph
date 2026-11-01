@@ -24,29 +24,28 @@ class OrderState(StrEnum):
     """Lifecycle states of an order."""
 
     ORDER_CREATED = "ORDER_CREATED"
-    ORDER_ADDRESS_SET = "ORDER_ADDRESS_SET"
-    ORDER_PAID = "ORDER_PAID"
-    ORDER_SHIPPED = "ORDER_SHIPPED"
-    ORDER_DELIVERED = "ORDER_DELIVERED"
-    ORDER_CANCELLED = "ORDER_CANCELLED"
-    ORDER_REFUNDED = "ORDER_REFUNDED"
+    ADDRESS_SET = "ADDRESS_SET"
+    PAYMENT_PENDING = "PAYMENT_PENDING"
+    PAID = "PAID"
+    SHIPPED = "SHIPPED"
+    DELIVERED = "DELIVERED"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
 
 
 ALLOWED_TRANSITIONS: Mapping[OrderState, frozenset[OrderState]] = MappingProxyType(
     {
-        OrderState.ORDER_CREATED: frozenset(
-            {OrderState.ORDER_ADDRESS_SET, OrderState.ORDER_CANCELLED}
+        OrderState.ORDER_CREATED: frozenset({OrderState.ADDRESS_SET, OrderState.CANCELLED}),
+        # ADDRESS_SET -> ADDRESS_SET is legal: the customer may correct the address.
+        OrderState.ADDRESS_SET: frozenset(
+            {OrderState.ADDRESS_SET, OrderState.PAYMENT_PENDING, OrderState.CANCELLED}
         ),
-        OrderState.ORDER_ADDRESS_SET: frozenset(
-            {OrderState.ORDER_PAID, OrderState.ORDER_CANCELLED}
-        ),
-        OrderState.ORDER_PAID: frozenset(
-            {OrderState.ORDER_SHIPPED, OrderState.ORDER_CANCELLED, OrderState.ORDER_REFUNDED}
-        ),
-        OrderState.ORDER_SHIPPED: frozenset({OrderState.ORDER_DELIVERED}),
-        OrderState.ORDER_DELIVERED: frozenset({OrderState.ORDER_REFUNDED}),
-        OrderState.ORDER_CANCELLED: frozenset(),
-        OrderState.ORDER_REFUNDED: frozenset(),
+        OrderState.PAYMENT_PENDING: frozenset({OrderState.PAID, OrderState.CANCELLED}),
+        OrderState.PAID: frozenset({OrderState.SHIPPED, OrderState.CANCELLED, OrderState.REFUNDED}),
+        OrderState.SHIPPED: frozenset({OrderState.DELIVERED}),
+        OrderState.DELIVERED: frozenset({OrderState.REFUNDED}),
+        OrderState.CANCELLED: frozenset(),
+        OrderState.REFUNDED: frozenset(),
     }
 )
 
@@ -207,7 +206,7 @@ class OrderRepository:
                 state=new_state,
                 address=address if address is not None else current.address,
                 payment_id=payment_id if payment_id is not None else current.payment_id,
-                refunded=current.refunded or new_state is OrderState.ORDER_REFUNDED,
+                refunded=current.refunded or new_state is OrderState.REFUNDED,
                 history=(*current.history, entry),
             )
             self._orders[order_id] = updated

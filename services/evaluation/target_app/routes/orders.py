@@ -10,8 +10,12 @@ from pydantic import BaseModel, Field
 from services.evaluation.target_app.repository import (
     CartStore,
     CartSummary,
+    InvalidStateTransitionException,
     OrderItem,
+    OrderNotFoundException,
+    OrderRecord,
     OrderRepository,
+    OrderState,
 )
 
 router = APIRouter()
@@ -36,6 +40,22 @@ class CartSummaryResponse(BaseModel):
 class CreateOrderResponse(BaseModel):
     order_id: str
     state: str
+
+
+class SetAddressRequest(BaseModel):
+    address: str = Field(min_length=1)
+
+
+class AddressResponse(BaseModel):
+    order_id: str
+    state: str
+    address: str
+
+
+class PaymentResponse(BaseModel):
+    order_id: str
+    state: str
+    payment_id: str
 
 
 def get_caller_sub(
@@ -88,3 +108,52 @@ def create_order(sub: CallerSub, repository: Repository, carts: Carts) -> Create
     order = repository.create_order(owner_sub=sub, items=cart.items)
     carts.clear(sub)
     return CreateOrderResponse(order_id=order.order_id, state=order.state.value)
+
+
+def _load_owned_order(repository: OrderRepository, order_id: str, sub: str) -> OrderRecord:
+    """Return the order if the caller owns it, else raise 404 / 403."""
+    try:
+        order = repository.get_order(order_id)
+    except OrderNotFoundException:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="order not found") from None
+    if order.owner_sub != sub:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="caller does not own this order")
+    return order
+
+
+def _invalid_state(exc: InvalidStateTransitionException) -> HTTPException:
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        detail={
+            "error": "invalid_state",
+            "current_state": exc.current.value,
+            "requested_state": exc.requested.value,
+        },
+    )
+
+
+@router.put("/orders/{order_id}/address", response_model=AddressResponse)
+def set_address(
+    order_id: str, body: SetAddressRequest, sub: CallerSub, repository: Repository
+) -> AddressResponse:
+    _load_owned_order(repository, order_id, sub)
+    try:
+        order = repository.update_order_state(
+            order_id, OrderState.ADDRESS_SET, sub, address=body.address
+        )
+    except InvalidStateTransitionException as exc:
+        raise _invalid_state(exc) from None
+    return AddressResponse(order_id=order.order_id, state=order.state.value, address=body.address)
+
+
+@router.post("/orders/{order_id}/payment", response_model=PaymentResponse)
+def start_payment(order_id: str, sub: CallerSub, repository: Repository) -> PaymentResponse:
+    _load_owned_order(repository, order_id, sub)
+    payment_id = f"pay_{order_id}"
+    try:
+        order = repository.update_order_state(
+            order_id, OrderState.PAYMENT_PENDING, sub, payment_id=payment_id
+        )
+    except InvalidStateTransitionException as exc:
+        raise _invalid_state(exc) from None
+    return PaymentResponse(order_id=order.order_id, state=order.state.value, payment_id=payment_id)
