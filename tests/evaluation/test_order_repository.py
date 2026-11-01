@@ -106,6 +106,7 @@ def test_full_happy_path(repo: OrderRepository) -> None:
         OrderState.ADDRESS_SET,
         OrderState.PAYMENT_PENDING,
         OrderState.PAID,
+        OrderState.FULFILLMENT_QUEUED,
         OrderState.SHIPPED,
         OrderState.DELIVERED,
     )
@@ -116,6 +117,7 @@ def test_full_happy_path(repo: OrderRepository) -> None:
         OrderState.ADDRESS_SET,
         OrderState.PAYMENT_PENDING,
         OrderState.PAID,
+        OrderState.FULFILLMENT_QUEUED,
         OrderState.SHIPPED,
         OrderState.DELIVERED,
     ]
@@ -222,6 +224,19 @@ def test_payment_pending_requires_address_first(repo: OrderRepository) -> None:
     order = repo.create_order("alice", ITEMS)
     with pytest.raises(InvalidStateTransitionException):
         repo.update_order_state(order.order_id, OrderState.PAYMENT_PENDING, "alice")
+
+
+def test_shipping_before_fulfillment_is_rejected(repo: OrderRepository) -> None:
+    order = repo.create_order("alice", ITEMS)
+    _advance(
+        repo,
+        order.order_id,
+        OrderState.ADDRESS_SET,
+        OrderState.PAYMENT_PENDING,
+        OrderState.PAID,
+    )
+    with pytest.raises(InvalidStateTransitionException):
+        repo.update_order_state(order.order_id, OrderState.SHIPPED, "alice")
 
 
 # --- non-strict mode --------------------------------------------------------------------

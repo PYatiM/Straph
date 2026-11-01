@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -58,6 +59,15 @@ class PaymentResponse(BaseModel):
     payment_id: str
 
 
+class PaymentWebhookRequest(BaseModel):
+    order_id: str = Field(min_length=1)
+
+
+class OrderStateResponse(BaseModel):
+    order_id: str
+    state: str
+
+
 def get_caller_sub(
     x_user_sub: Annotated[str | None, Header()] = None,
 ) -> str:
@@ -65,6 +75,15 @@ def get_caller_sub(
     if x_user_sub is None or not x_user_sub.strip():
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="missing X-User-Sub header")
     return x_user_sub.strip()
+
+
+def get_caller_roles(
+    x_user_roles: Annotated[str | None, Header()] = None,
+) -> frozenset[str]:
+    """Read the caller's roles from the comma-separated ``X-User-Roles`` header."""
+    if not x_user_roles:
+        return frozenset()
+    return frozenset(r.strip() for r in x_user_roles.split(",") if r.strip())
 
 
 def get_repository(request: Request) -> OrderRepository:
@@ -78,8 +97,28 @@ def get_cart_store(request: Request) -> CartStore:
 
 
 CallerSub = Annotated[str, Depends(get_caller_sub)]
+CallerRoles = Annotated[frozenset[str], Depends(get_caller_roles)]
 Repository = Annotated[OrderRepository, Depends(get_repository)]
 Carts = Annotated[CartStore, Depends(get_cart_store)]
+
+
+ROLE_PAYMENT_GATEWAY = "payment-gateway"
+ROLE_WAREHOUSE = "warehouse"
+
+
+def require_role(role: str) -> Callable[[str, frozenset[str]], str]:
+    """Build a dependency that returns the caller's sub only if they hold ``role``."""
+
+    def dependency(sub: CallerSub, roles: CallerRoles) -> str:
+        if role not in roles:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=f"role '{role}' required")
+        return sub
+
+    return dependency
+
+
+GatewaySub = Annotated[str, Depends(require_role(ROLE_PAYMENT_GATEWAY))]
+WarehouseSub = Annotated[str, Depends(require_role(ROLE_WAREHOUSE))]
 
 
 def _cart_response(cart: CartSummary) -> CartSummaryResponse:
@@ -157,3 +196,28 @@ def start_payment(order_id: str, sub: CallerSub, repository: Repository) -> Paym
     except InvalidStateTransitionException as exc:
         raise _invalid_state(exc) from None
     return PaymentResponse(order_id=order.order_id, state=order.state.value, payment_id=payment_id)
+
+
+def _advance_by_role(
+    repository: OrderRepository, order_id: str, new_state: OrderState, actor_sub: str
+) -> OrderStateResponse:
+    """Move any order (no ownership check) to ``new_state``; used by role-based routes."""
+    try:
+        order = repository.update_order_state(order_id, new_state, actor_sub)
+    except OrderNotFoundException:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="order not found") from None
+    except InvalidStateTransitionException as exc:
+        raise _invalid_state(exc) from None
+    return OrderStateResponse(order_id=order.order_id, state=order.state.value)
+
+
+@router.post("/payments/webhook", response_model=OrderStateResponse)
+def payment_webhook(
+    body: PaymentWebhookRequest, sub: GatewaySub, repository: Repository
+) -> OrderStateResponse:
+    return _advance_by_role(repository, body.order_id, OrderState.PAID, sub)
+
+
+@router.post("/orders/{order_id}/fulfill", response_model=OrderStateResponse)
+def fulfill_order(order_id: str, sub: WarehouseSub, repository: Repository) -> OrderStateResponse:
+    return _advance_by_role(repository, order_id, OrderState.FULFILLMENT_QUEUED, sub)

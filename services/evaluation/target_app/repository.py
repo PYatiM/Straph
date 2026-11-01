@@ -27,6 +27,7 @@ class OrderState(StrEnum):
     ADDRESS_SET = "ADDRESS_SET"
     PAYMENT_PENDING = "PAYMENT_PENDING"
     PAID = "PAID"
+    FULFILLMENT_QUEUED = "FULFILLMENT_QUEUED"
     SHIPPED = "SHIPPED"
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
@@ -41,7 +42,10 @@ ALLOWED_TRANSITIONS: Mapping[OrderState, frozenset[OrderState]] = MappingProxyTy
             {OrderState.ADDRESS_SET, OrderState.PAYMENT_PENDING, OrderState.CANCELLED}
         ),
         OrderState.PAYMENT_PENDING: frozenset({OrderState.PAID, OrderState.CANCELLED}),
-        OrderState.PAID: frozenset({OrderState.SHIPPED, OrderState.CANCELLED, OrderState.REFUNDED}),
+        OrderState.PAID: frozenset(
+            {OrderState.FULFILLMENT_QUEUED, OrderState.CANCELLED, OrderState.REFUNDED}
+        ),
+        OrderState.FULFILLMENT_QUEUED: frozenset({OrderState.SHIPPED}),
         OrderState.SHIPPED: frozenset({OrderState.DELIVERED}),
         OrderState.DELIVERED: frozenset({OrderState.REFUNDED}),
         OrderState.CANCELLED: frozenset(),
