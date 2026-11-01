@@ -239,6 +239,28 @@ def test_shipping_before_fulfillment_is_rejected(repo: OrderRepository) -> None:
         repo.update_order_state(order.order_id, OrderState.SHIPPED, "alice")
 
 
+def test_extra_sources_allows_one_listed_illegal_move(repo: OrderRepository) -> None:
+    order = repo.create_order("alice", ITEMS)
+    repo.update_order_state(
+        order.order_id,
+        OrderState.FULFILLMENT_QUEUED,
+        "mallory",
+        extra_sources={OrderState.ORDER_CREATED},
+    )
+    assert repo.get_order(order.order_id).state is OrderState.FULFILLMENT_QUEUED
+
+
+def test_extra_sources_only_applies_to_listed_states(repo: OrderRepository) -> None:
+    order = repo.create_order("alice", ITEMS)
+    with pytest.raises(InvalidStateTransitionException):
+        repo.update_order_state(
+            order.order_id,
+            OrderState.FULFILLMENT_QUEUED,
+            "mallory",
+            extra_sources={OrderState.ADDRESS_SET},
+        )
+
+
 # --- non-strict mode --------------------------------------------------------------------
 
 

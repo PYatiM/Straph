@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import itertools
 import threading
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -191,18 +191,25 @@ class OrderRepository:
         *,
         address: str | None = None,
         payment_id: str | None = None,
+        extra_sources: Collection[OrderState] = (),
     ) -> OrderRecord:
         """Move an order to ``new_state`` and return the new snapshot.
 
         The check and the write happen under one lock, so two threads cannot both pass
         the guard for the same state. ``address`` and ``payment_id`` are optional data
         attached to the transition. Entering ``REFUNDED`` sets ``refunded=True``.
+
+        ``extra_sources`` lists states from which this one call is also allowed to make
+        the move, even though the lifecycle forbids it. Only the planted flaws use it.
         """
         if not actor_sub:
             raise ValueError("actor_sub must not be empty")
         with self._lock:
             current = self.get_order(order_id)
-            if self._strict and new_state not in ALLOWED_TRANSITIONS[current.state]:
+            legal = (
+                new_state in ALLOWED_TRANSITIONS[current.state] or current.state in extra_sources
+            )
+            if self._strict and not legal:
                 raise InvalidStateTransitionException(order_id, current.state, new_state)
             entry = HistoryEntry(current.state, new_state, actor_sub, self._clock())
             updated = replace(

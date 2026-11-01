@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from services.evaluation.target_app.flaws import Flaws
 from services.evaluation.target_app.repository import (
     CartStore,
     CartSummary,
@@ -97,6 +98,11 @@ def get_repository(request: Request) -> OrderRepository:
     return repository
 
 
+def get_flaws(request: Request) -> Flaws:
+    flaws: Flaws = request.app.state.flaws
+    return flaws
+
+
 def get_cart_store(request: Request) -> CartStore:
     carts: CartStore = request.app.state.carts
     return carts
@@ -106,6 +112,7 @@ CallerSub = Annotated[str, Depends(get_caller_sub)]
 CallerRoles = Annotated[frozenset[str], Depends(get_caller_roles)]
 Repository = Annotated[OrderRepository, Depends(get_repository)]
 Carts = Annotated[CartStore, Depends(get_cart_store)]
+FlawSettings = Annotated[Flaws, Depends(get_flaws)]
 
 
 ROLE_PAYMENT_GATEWAY = "payment-gateway"
@@ -183,12 +190,18 @@ def _invalid_state(exc: InvalidStateTransitionException) -> HTTPException:
 
 @router.put("/orders/{order_id}/address", response_model=AddressResponse)
 def set_address(
-    order_id: str, body: SetAddressRequest, sub: CallerSub, repository: Repository
+    order_id: str,
+    body: SetAddressRequest,
+    sub: CallerSub,
+    repository: Repository,
+    flaws: FlawSettings,
 ) -> AddressResponse:
     _load_owned_order(repository, order_id, sub)
+    # FLAW (ALLOW_POST_SHIP_ADDRESS_EDIT): address may also be changed once SHIPPED.
+    extra = frozenset({OrderState.SHIPPED}) if flaws.post_ship_address_edit else frozenset()
     try:
         order = repository.update_order_state(
-            order_id, OrderState.ADDRESS_SET, sub, address=body.address
+            order_id, OrderState.ADDRESS_SET, sub, address=body.address, extra_sources=extra
         )
     except InvalidStateTransitionException as exc:
         raise _invalid_state(exc) from None
@@ -209,11 +222,17 @@ def start_payment(order_id: str, sub: CallerSub, repository: Repository) -> Paym
 
 
 def _advance_by_role(
-    repository: OrderRepository, order_id: str, new_state: OrderState, actor_sub: str
+    repository: OrderRepository,
+    order_id: str,
+    new_state: OrderState,
+    actor_sub: str,
+    extra_sources: frozenset[OrderState] = frozenset(),
 ) -> OrderStateResponse:
     """Move any order (no ownership check) to ``new_state``; used by role-based routes."""
     try:
-        order = repository.update_order_state(order_id, new_state, actor_sub)
+        order = repository.update_order_state(
+            order_id, new_state, actor_sub, extra_sources=extra_sources
+        )
     except OrderNotFoundException:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="order not found") from None
     except InvalidStateTransitionException as exc:
@@ -229,8 +248,12 @@ def payment_webhook(
 
 
 @router.post("/orders/{order_id}/fulfill", response_model=OrderStateResponse)
-def fulfill_order(order_id: str, sub: WarehouseSub, repository: Repository) -> OrderStateResponse:
-    return _advance_by_role(repository, order_id, OrderState.FULFILLMENT_QUEUED, sub)
+def fulfill_order(
+    order_id: str, sub: WarehouseSub, repository: Repository, flaws: FlawSettings
+) -> OrderStateResponse:
+    # FLAW (ALLOW_SKIP_PAYMENT): fulfilment may start straight from ADDRESS_SET.
+    extra = frozenset({OrderState.ADDRESS_SET}) if flaws.skip_payment else frozenset()
+    return _advance_by_role(repository, order_id, OrderState.FULFILLMENT_QUEUED, sub, extra)
 
 
 @router.post("/orders/{order_id}/ship", response_model=OrderStateResponse)
@@ -244,8 +267,17 @@ def deliver_order(order_id: str, sub: CarrierSub, repository: Repository) -> Ord
 
 
 @router.post("/orders/{order_id}/cancel", response_model=OrderStateResponse)
-def cancel_order(order_id: str, sub: CallerSub, repository: Repository) -> OrderStateResponse:
-    _load_owned_order(repository, order_id, sub)
+def cancel_order(
+    order_id: str, sub: CallerSub, repository: Repository, flaws: FlawSettings
+) -> OrderStateResponse:
+    if flaws.bola_cancel:
+        # FLAW (ALLOW_BOLA_CANCEL): any authenticated caller may cancel any order.
+        try:
+            repository.get_order(order_id)
+        except OrderNotFoundException:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="order not found") from None
+    else:
+        _load_owned_order(repository, order_id, sub)
     try:
         order = repository.update_order_state(order_id, OrderState.CANCELLED, sub)
     except InvalidStateTransitionException as exc:
@@ -254,7 +286,11 @@ def cancel_order(order_id: str, sub: CallerSub, repository: Repository) -> Order
 
 
 @router.post("/orders/{order_id}/refund", response_model=RefundResponse)
-def refund_order(order_id: str, sub: SupportSub, repository: Repository) -> RefundResponse:
-    result = _advance_by_role(repository, order_id, OrderState.REFUNDED, sub)
+def refund_order(
+    order_id: str, sub: SupportSub, repository: Repository, flaws: FlawSettings
+) -> RefundResponse:
+    # FLAW (ALLOW_DOUBLE_REFUND): a refunded order may be refunded again.
+    extra = frozenset({OrderState.REFUNDED}) if flaws.double_refund else frozenset()
+    result = _advance_by_role(repository, order_id, OrderState.REFUNDED, sub, extra)
     refunded = repository.get_order(order_id).refunded
     return RefundResponse(order_id=result.order_id, state=result.state, refunded=refunded)
