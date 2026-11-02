@@ -59,11 +59,27 @@ services:
       start_period: 40s
 
   target-app:
-    # Placeholder: replace with the real evaluation target application.
     build:
-      context: ./services/evaluation/target_app
+      context: .
+      dockerfile: services/evaluation/target_app/Dockerfile
     ports:
       - "127.0.0.1:8001:8001"
+    environment:
+      ALLOW_SKIP_PAYMENT: ${ALLOW_SKIP_PAYMENT:-false}
+      ALLOW_POST_SHIP_ADDRESS_EDIT: ${ALLOW_POST_SHIP_ADDRESS_EDIT:-false}
+      ALLOW_DOUBLE_REFUND: ${ALLOW_DOUBLE_REFUND:-false}
+      ALLOW_BOLA_CANCEL: ${ALLOW_BOLA_CANCEL:-false}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   kafka-data:

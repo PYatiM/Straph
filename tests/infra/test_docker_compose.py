@@ -83,10 +83,11 @@ def test_neo4j_auth_from_environment(compose: dict[str, Any]) -> None:
     assert "neo4j-data:/data" in svc(compose, "neo4j")["volumes"]
 
 
-def test_target_app_build_placeholder(compose: dict[str, Any]) -> None:
-    context = svc(compose, "target-app")["build"]["context"]
-    assert context == "./services/evaluation/target_app"
-    assert (ROOT / context / "Dockerfile").is_file()
+def test_target_app_build(compose: dict[str, Any]) -> None:
+    build = svc(compose, "target-app")["build"]
+    assert build["context"] == "."
+    assert build["dockerfile"] == "services/evaluation/target_app/Dockerfile"
+    assert (ROOT / build["context"] / build["dockerfile"]).is_file()
 
 
 @pytest.mark.parametrize(
@@ -124,5 +125,12 @@ def test_env_example_covers_interpolated_variables() -> None:
         for line in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines()
         if "=" in line and not line.startswith("#")
     }
-    assert variables == {"KAFKA_CLUSTER_ID", "NEO4J_PASSWORD"}
+    assert variables == {
+        "KAFKA_CLUSTER_ID",
+        "NEO4J_PASSWORD",
+        "ALLOW_SKIP_PAYMENT",
+        "ALLOW_POST_SHIP_ADDRESS_EDIT",
+        "ALLOW_DOUBLE_REFUND",
+        "ALLOW_BOLA_CANCEL",
+    }
     assert variables <= defined
