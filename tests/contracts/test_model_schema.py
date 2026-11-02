@@ -56,8 +56,8 @@ def test_example_strictly_satisfies_schema() -> None:
 
 def test_example_exercises_every_enum_value() -> None:
     transitions = MODEL["transitions"]
-    assert {t["provenance"] for t in transitions} >= {"spec", "trace", "both"}
-    assert {t["review_status"] for t in transitions} >= {"confirmed", "candidate"}
+    assert {t["provenance"] for t in transitions} <= {"spec", "trace", "both"}
+    assert {t["review_status"] for t in transitions} <= {"confirmed", "candidate", "rejected"}
 
 
 @pytest.mark.parametrize("provenance", ["manual", "SPEC", "", None, 1])

@@ -13,7 +13,7 @@ repos:
         types: [python]
       - id: pytest
         name: pytest
-        entry: pytest
+        entry: python -m pytest
         language: system
         pass_filenames: false
         always_run: true

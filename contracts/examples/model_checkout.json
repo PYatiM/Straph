@@ -1,38 +1,246 @@
 {
   "model_version": "9fceb02d41@2026-10-13T09:00:00Z",
   "resource_type": "Order",
-  "initial_state": "S0",
+  "initial_state": "CART_ACTIVE",
   "states": [
-    {"state_id": "S0", "terminal": false, "description": "No order exists yet"},
-    {"state_id": "S1", "terminal": false, "description": "Order created, awaiting payment"},
-    {"state_id": "S2", "terminal": false, "description": "Order paid, awaiting confirmation"},
-    {"state_id": "S3", "terminal": true, "description": "Order confirmed"},
-    {"state_id": "S4", "terminal": true, "description": "Order cancelled"}
+    {
+      "state_id": "CART_ACTIVE",
+      "terminal": false,
+      "description": "Active shopping cart accepting item additions"
+    },
+    {
+      "state_id": "ORDER_CREATED",
+      "terminal": false,
+      "description": "Order created from cart, awaiting shipping address"
+    },
+    {
+      "state_id": "ADDRESS_SET",
+      "terminal": false,
+      "description": "Shipping address set, awaiting payment initiation"
+    },
+    {
+      "state_id": "PAYMENT_PENDING",
+      "terminal": false,
+      "description": "Payment authorization initiated, awaiting gateway confirmation"
+    },
+    {
+      "state_id": "PAID",
+      "terminal": false,
+      "description": "Payment settled and confirmed by webhook"
+    },
+    {
+      "state_id": "FULFILLMENT_QUEUED",
+      "terminal": false,
+      "description": "Paid order queued for warehouse fulfillment"
+    },
+    {
+      "state_id": "SHIPPED",
+      "terminal": false,
+      "description": "Order dispatched and handed over to carrier"
+    },
+    {
+      "state_id": "DELIVERED",
+      "terminal": false,
+      "description": "Order successfully delivered to customer destination"
+    },
+    {
+      "state_id": "CANCELLED",
+      "terminal": true,
+      "description": "Order cancelled prior to fulfillment"
+    },
+    {
+      "state_id": "REFUNDED",
+      "terminal": true,
+      "description": "Order payment refunded (single-use terminal transition)"
+    }
   ],
   "transitions": [
     {
       "transition_id": "T1",
-      "operation": {"method": "POST", "path_template": "/orders"},
-      "from_states": ["S0"], "to_state": "S1", "allowed_roles": ["customer"],
-      "single_use": true, "provenance": "spec", "support_count": 0, "review_status": "confirmed"
+      "operation": {
+        "method": "POST",
+        "path_template": "/cart/items"
+      },
+      "from_states": [
+        "CART_ACTIVE"
+      ],
+      "to_state": "CART_ACTIVE",
+      "allowed_roles": [
+        "customer"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
     },
     {
       "transition_id": "T2",
-      "operation": {"method": "POST", "path_template": "/orders/{id}/payment"},
-      "from_states": ["S1"], "to_state": "S2", "allowed_roles": ["customer"],
-      "single_use": true, "provenance": "both", "support_count": 120, "review_status": "confirmed"
+      "operation": {
+        "method": "POST",
+        "path_template": "/orders"
+      },
+      "from_states": [
+        "CART_ACTIVE"
+      ],
+      "to_state": "ORDER_CREATED",
+      "allowed_roles": [
+        "customer"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
     },
     {
       "transition_id": "T3",
-      "operation": {"method": "POST", "path_template": "/orders/{id}/confirm"},
-      "from_states": ["S2"], "to_state": "S3", "allowed_roles": ["customer"],
-      "single_use": true, "provenance": "spec", "support_count": 0, "review_status": "confirmed"
+      "operation": {
+        "method": "PUT",
+        "path_template": "/orders/{id}/address"
+      },
+      "from_states": [
+        "ORDER_CREATED",
+        "ADDRESS_SET"
+      ],
+      "to_state": "ADDRESS_SET",
+      "allowed_roles": [
+        "customer"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
     },
     {
       "transition_id": "T4",
-      "operation": {"method": "POST", "path_template": "/orders/{id}/cancel"},
-      "from_states": ["S1", "S2"], "to_state": "S4", "allowed_roles": ["customer", "support"],
-      "single_use": false, "provenance": "trace", "support_count": 7, "review_status": "candidate"
+      "operation": {
+        "method": "POST",
+        "path_template": "/orders/{id}/payment"
+      },
+      "from_states": [
+        "ADDRESS_SET"
+      ],
+      "to_state": "PAYMENT_PENDING",
+      "allowed_roles": [
+        "customer"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T5",
+      "operation": {
+        "method": "POST",
+        "path_template": "/payments/webhook"
+      },
+      "from_states": [
+        "PAYMENT_PENDING"
+      ],
+      "to_state": "PAID",
+      "allowed_roles": [
+        "payment-gateway"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T6",
+      "operation": {
+        "method": "POST",
+        "path_template": "/orders/{id}/fulfill"
+      },
+      "from_states": [
+        "PAID"
+      ],
+      "to_state": "FULFILLMENT_QUEUED",
+      "allowed_roles": [
+        "warehouse"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T7",
+      "operation": {
+        "method": "POST",
+        "path_template": "/orders/{id}/ship"
+      },
+      "from_states": [
+        "FULFILLMENT_QUEUED"
+      ],
+      "to_state": "SHIPPED",
+      "allowed_roles": [
+        "warehouse"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T8",
+      "operation": {
+        "method": "POST",
+        "path_template": "/orders/{id}/deliver"
+      },
+      "from_states": [
+        "SHIPPED"
+      ],
+      "to_state": "DELIVERED",
+      "allowed_roles": [
+        "carrier",
+        "warehouse"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T9",
+      "operation": {
+        "method": "POST",
+        "path_template": "/orders/{id}/cancel"
+      },
+      "from_states": [
+        "ORDER_CREATED",
+        "ADDRESS_SET",
+        "PAYMENT_PENDING",
+        "PAID"
+      ],
+      "to_state": "CANCELLED",
+      "allowed_roles": [
+        "customer",
+        "support"
+      ],
+      "single_use": false,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
+    },
+    {
+      "transition_id": "T10",
+      "operation": {
+        "method": "POST",
+        "path_template": "/orders/{id}/refund"
+      },
+      "from_states": [
+        "PAID",
+        "DELIVERED"
+      ],
+      "to_state": "REFUNDED",
+      "allowed_roles": [
+        "support"
+      ],
+      "single_use": true,
+      "provenance": "spec",
+      "support_count": 0,
+      "review_status": "confirmed"
     }
   ]
 }
