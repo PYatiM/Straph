@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from services.evaluation.target_app.flaws import Flaws
+from services.evaluation.target_app.openapi_export import install_openapi
 from services.evaluation.target_app.repository import CartStore, OrderRepository
 from services.evaluation.target_app.routes.orders import router as orders_router
 
@@ -23,6 +24,7 @@ def create_app(*, strict: bool = True, flaws: Flaws | None = None) -> FastAPI:
     app.state.carts = CartStore()
     app.state.flaws = flaws if flaws is not None else Flaws.from_env()
     app.include_router(orders_router)
+    install_openapi(app)
     return app
 
 

@@ -146,7 +146,7 @@ def _cart_response(cart: CartSummary) -> CartSummaryResponse:
     )
 
 
-@router.post("/cart/items", response_model=CartSummaryResponse)
+@router.post("/cart/items", operation_id="AddCartItem", response_model=CartSummaryResponse)
 def add_cart_item(body: AddCartItemRequest, sub: CallerSub, carts: Carts) -> CartSummaryResponse:
     cart = carts.add_item(sub, OrderItem(sku=body.sku, quantity=body.quantity))
     return _cart_response(cart)
@@ -154,6 +154,7 @@ def add_cart_item(body: AddCartItemRequest, sub: CallerSub, carts: Carts) -> Car
 
 @router.post(
     "/orders",
+    operation_id="CreateOrder",
     response_model=CreateOrderResponse,
     status_code=status.HTTP_201_CREATED,
 )
@@ -188,7 +189,9 @@ def _invalid_state(exc: InvalidStateTransitionException) -> HTTPException:
     )
 
 
-@router.put("/orders/{order_id}/address", response_model=AddressResponse)
+@router.put(
+    "/orders/{order_id}/address", operation_id="UpdateAddress", response_model=AddressResponse
+)
 def set_address(
     order_id: str,
     body: SetAddressRequest,
@@ -208,7 +211,9 @@ def set_address(
     return AddressResponse(order_id=order.order_id, state=order.state.value, address=body.address)
 
 
-@router.post("/orders/{order_id}/payment", response_model=PaymentResponse)
+@router.post(
+    "/orders/{order_id}/payment", operation_id="InitiatePayment", response_model=PaymentResponse
+)
 def start_payment(order_id: str, sub: CallerSub, repository: Repository) -> PaymentResponse:
     _load_owned_order(repository, order_id, sub)
     payment_id = f"pay_{order_id}"
@@ -240,14 +245,16 @@ def _advance_by_role(
     return OrderStateResponse(order_id=order.order_id, state=order.state.value)
 
 
-@router.post("/payments/webhook", response_model=OrderStateResponse)
+@router.post("/payments/webhook", operation_id="PaymentWebhook", response_model=OrderStateResponse)
 def payment_webhook(
     body: PaymentWebhookRequest, sub: GatewaySub, repository: Repository
 ) -> OrderStateResponse:
     return _advance_by_role(repository, body.order_id, OrderState.PAID, sub)
 
 
-@router.post("/orders/{order_id}/fulfill", response_model=OrderStateResponse)
+@router.post(
+    "/orders/{order_id}/fulfill", operation_id="FulfillOrder", response_model=OrderStateResponse
+)
 def fulfill_order(
     order_id: str, sub: WarehouseSub, repository: Repository, flaws: FlawSettings
 ) -> OrderStateResponse:
@@ -256,17 +263,21 @@ def fulfill_order(
     return _advance_by_role(repository, order_id, OrderState.FULFILLMENT_QUEUED, sub, extra)
 
 
-@router.post("/orders/{order_id}/ship", response_model=OrderStateResponse)
+@router.post("/orders/{order_id}/ship", operation_id="ShipOrder", response_model=OrderStateResponse)
 def ship_order(order_id: str, sub: WarehouseSub, repository: Repository) -> OrderStateResponse:
     return _advance_by_role(repository, order_id, OrderState.SHIPPED, sub)
 
 
-@router.post("/orders/{order_id}/deliver", response_model=OrderStateResponse)
+@router.post(
+    "/orders/{order_id}/deliver", operation_id="DeliverOrder", response_model=OrderStateResponse
+)
 def deliver_order(order_id: str, sub: CarrierSub, repository: Repository) -> OrderStateResponse:
     return _advance_by_role(repository, order_id, OrderState.DELIVERED, sub)
 
 
-@router.post("/orders/{order_id}/cancel", response_model=OrderStateResponse)
+@router.post(
+    "/orders/{order_id}/cancel", operation_id="CancelOrder", response_model=OrderStateResponse
+)
 def cancel_order(
     order_id: str, sub: CallerSub, repository: Repository, flaws: FlawSettings
 ) -> OrderStateResponse:
@@ -285,7 +296,7 @@ def cancel_order(
     return OrderStateResponse(order_id=order.order_id, state=order.state.value)
 
 
-@router.post("/orders/{order_id}/refund", response_model=RefundResponse)
+@router.post("/orders/{order_id}/refund", operation_id="RefundOrder", response_model=RefundResponse)
 def refund_order(
     order_id: str, sub: SupportSub, repository: Repository, flaws: FlawSettings
 ) -> RefundResponse:
