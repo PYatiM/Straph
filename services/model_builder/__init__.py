@@ -10,6 +10,7 @@ from services.model_builder.graph_queries import (
 )
 from services.model_builder.neo4j_loader import InMemoryGraphDriver, Neo4jModelLoader
 from services.model_builder.openapi_parser import CandidateOperation, OpenAPIParser
+from services.model_builder.session_grouper import group_events_by_object
 
 __all__ = [
     "CandidateOperation",
@@ -19,5 +20,6 @@ __all__ = [
     "get_legal_transitions",
     "get_shortest_path",
     "get_source_states",
+    "group_events_by_object",
     "is_state_reachable",
 ]
