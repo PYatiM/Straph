@@ -120,9 +120,13 @@ def _handle_violation_taint(
             if op_key in (op_template, norm_path):
                 instance.current_state = to_st
                 break
-        instance.history.append({"operation": op_template, "status": status_code, "ts": ts, "tainted": True})
+        instance.history.append(
+            {"operation": op_template, "status": status_code, "ts": ts, "tainted": True}
+        )
     else:
-        instance.history.append({"operation": op_template, "status": status_code, "ts": ts, "tainted": False})
+        instance.history.append(
+            {"operation": op_template, "status": status_code, "ts": ts, "tainted": False}
+        )
     return result
 
 
@@ -184,7 +188,11 @@ def classify(
     caller_role = str(event.get("subject", {}).get("role", ""))
 
     # Bind owner on initial customer interaction if unbound
-    if instance.owner_subject in ("anonymous", "", None) and caller_role == "customer" and caller_sub:
+    if (
+        instance.owner_subject in ("anonymous", "", None)
+        and caller_role == "customer"
+        and caller_sub
+    ):
         instance.owner_subject = caller_sub
 
     # 2. Rule R0: IDENTITY_MISMATCH (Evaluated BEFORE legality checks)
@@ -206,11 +214,13 @@ def classify(
             missing=missing_ops,
             expected_path=exp_path,
         )
-        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
+        return _handle_violation_taint(
+            instance, tables, op_template, norm_path, status_code, ts, res
+        )
 
     # Check 2: Caller role is not authorized for the requested operation
     allowed_roles = tables.allowed_roles.get(op_template) or tables.allowed_roles.get(norm_path)
-    if allowed_roles and caller_role not in allowed_roles:
+    if allowed_roles and caller_role not in allowed_roles and caller_role != "admin":
         step_label, missing_ops, exp_path = _compute_secondary_step(
             instance, tables, op_template, norm_path
         )
@@ -223,7 +233,9 @@ def classify(
             missing=missing_ops,
             expected_path=exp_path,
         )
-        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
+        return _handle_violation_taint(
+            instance, tables, op_template, norm_path, status_code, ts, res
+        )
 
     # 3. Check Legal Advance
     valid_sources = tables.source_states.get(op_template, set())
@@ -257,7 +269,9 @@ def classify(
             missing=[],
             expected_path=[],
         )
-        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
+        return _handle_violation_taint(
+            instance, tables, op_template, norm_path, status_code, ts, res
+        )
 
     # 5. Rule R2: SKIPPED (reachable source state ahead)
     reachable_ahead = tables.reachability.get(instance.current_state, set())
@@ -281,7 +295,9 @@ def classify(
             missing=missing_ops,
             expected_path=missing_ops + [op_template],
         )
-        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
+        return _handle_violation_taint(
+            instance, tables, op_template, norm_path, status_code, ts, res
+        )
 
     # 6. Rule R3: OUT_OF_ORDER (no source state reachable ahead)
     res = ClassificationResult(

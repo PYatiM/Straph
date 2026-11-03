@@ -86,7 +86,11 @@ def test_build_alert_rule_r2(builder: AlertBuilder, instance: InstanceRecord) ->
         rule="R2",
         severity="accepted",
         missing=["POST /orders/{id}/payment", "POST /payments/webhook"],
-        expected_path=["POST /orders/{id}/payment", "POST /payments/webhook", "POST /orders/{id}/fulfill"],
+        expected_path=[
+            "POST /orders/{id}/payment",
+            "POST /payments/webhook",
+            "POST /orders/{id}/fulfill",
+        ],
     )
 
     alert = builder.build_alert(instance, event, classification, "checkout-v0")
@@ -134,7 +138,9 @@ def test_build_alert_rule_r4(builder: AlertBuilder, instance: InstanceRecord) ->
     assert alert["severity"] == "attempted"
 
 
-def test_invalid_payload_raises_schema_validation_error(builder: AlertBuilder, instance: InstanceRecord) -> None:
+def test_invalid_payload_raises_schema_validation_error(
+    builder: AlertBuilder, instance: InstanceRecord
+) -> None:
     """Verify corrupted classification fields raise ValidationError."""
     event = _base_event()
     # Invalid rule and label not in schema enum

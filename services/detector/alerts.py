@@ -45,7 +45,11 @@ class AlertBuilder:
         alert_id = str(uuid.uuid4())
         event_id = str(event.get("event_id") or uuid.uuid4())
 
-        ts = str(event.get("ts_completed") or event.get("ts_received") or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        ts = str(
+            event.get("ts_completed")
+            or event.get("ts_received")
+            or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
         # Ensure timestamp ends with Z or timezone offset for ISO format
         if not ts.endswith("Z") and "+" not in ts and "-" not in ts[10:]:
             ts = f"{ts}Z"

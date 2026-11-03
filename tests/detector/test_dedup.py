@@ -94,7 +94,9 @@ def test_tc8_legal_retry_generates_zero_alerts(tables: ModelTables) -> None:
 
     # After event 4 (500), state was ADDRESS_SET. After event 5 (200 retry), state is PAYMENT_PENDING
     assert order.current_state == "PAYMENT_PENDING"
-    assert "idemp-999" in order.idempotency_keys or any("idemp-999" in k for k in order.idempotency_keys)
+    assert "idemp-999" in order.idempotency_keys or any(
+        "idemp-999" in k for k in order.idempotency_keys
+    )
 
 
 def test_tc10_duplicate_kafka_delivery_generates_zero_alerts(tables: ModelTables) -> None:

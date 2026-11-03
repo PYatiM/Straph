@@ -45,7 +45,9 @@ def test_known_operation_passes_r4(instance: InstanceRecord, tables: ModelTables
     assert result is None  # Benign with respect to R4
 
 
-def test_known_parameterized_operation_passes_r4(instance: InstanceRecord, tables: ModelTables) -> None:
+def test_known_parameterized_operation_passes_r4(
+    instance: InstanceRecord, tables: ModelTables
+) -> None:
     """Parameterized operation path /orders/1001/address matches /orders/{id}/address."""
     instance.current_state = "ORDER_CREATED"
     event = {
@@ -81,7 +83,9 @@ def test_unknown_operation_triggers_rule_r4(instance: InstanceRecord, tables: Mo
     assert instance.tainted is False
 
 
-def test_arbitrary_method_and_path_trigger_r4(instance: InstanceRecord, tables: ModelTables) -> None:
+def test_arbitrary_method_and_path_trigger_r4(
+    instance: InstanceRecord, tables: ModelTables
+) -> None:
     """Unmodeled methods or paths trigger R4."""
     event = {
         "event_id": "00000000-0000-4000-8000-000000000088",

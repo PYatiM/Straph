@@ -106,7 +106,9 @@ def test_concurrent_access() -> None:
     def worker(worker_id: int) -> None:
         for i in range(50):
             res_id = f"item_{i % 5}"
-            rec = store.get_or_create("Item", res_id, initial_state="NEW", owner_subject=f"worker_{worker_id}")
+            rec = store.get_or_create(
+                "Item", res_id, initial_state="NEW", owner_subject=f"worker_{worker_id}"
+            )
             rec.current_state = f"STATE_{worker_id}_{i}"
             store.update(rec)
 
