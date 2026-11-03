@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from services.gateway.app import create_gateway_app
 from services.gateway.rate_limit_middleware import (
     RateLimitMiddleware,
     extract_caller_sub,
@@ -23,6 +24,7 @@ __all__ = [
     "RateLimiterProtocol",
     "RateLimiterValidationError",
     "RedisFixedWindowRateLimiter",
+    "create_gateway_app",
     "extract_caller_sub",
     "extract_client_ip",
     "extract_rate_limit_key",
