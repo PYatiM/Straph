@@ -21,11 +21,12 @@ UNKNOWN_RESOURCE = "unknown"
 
 _VERSION_SEGMENT = re.compile(r"^(api|v[0-9]+)$", re.IGNORECASE)
 _TEMPLATE_SEGMENT = re.compile(r"^\{[^{}]+\}$|^:[A-Za-z_][A-Za-z0-9_]*$")
+_NON_ID_SEGMENTS = frozenset({"webhook", "health", "ready", "metrics", "export"})
 
 
 @dataclass(frozen=True)
 class SubjectContext:
-    """Caller identity as presented in the bearer token."""
+    """Caller identity as presented in the bearer token or gateway identity headers."""
 
     issuer: str
     sub: str
@@ -34,7 +35,7 @@ class SubjectContext:
 
     @property
     def is_anonymous(self) -> bool:
-        """True when no usable bearer token was presented."""
+        """True when no usable bearer token or identity header was presented."""
         return self.sub == ANONYMOUS and self.issuer == ANONYMOUS
 
 
@@ -70,31 +71,41 @@ def _role_claim(claims: Mapping[str, Any]) -> str | None:
 
 
 def extract_subject_from_headers(headers: Mapping[str, str]) -> SubjectContext:
-    """Parse `Authorization: Bearer <jwt>` into a SubjectContext.
+    """Parse `Authorization: Bearer <jwt>` or gateway `X-User-*` headers into a SubjectContext.
 
-    Falls back to the anonymous subject when the header is absent, is not a Bearer
-    credential, or the token or its `sub` claim is unusable. A missing `iss` or `role`
-    becomes "unknown". Header names are matched case-insensitively.
+    Falls back to `X-User-Sub` and `X-User-Roles` headers if no Bearer token is provided.
+    Falls back to the anonymous subject when neither is present or usable.
     """
     auth = next((v for k, v in headers.items() if k.lower() == "authorization"), None)
-    if not isinstance(auth, str):
-        return ANONYMOUS_SUBJECT
-    scheme, _, token = auth.strip().partition(" ")
-    token = token.strip()
-    if scheme.lower() != "bearer" or not token:
-        return ANONYMOUS_SUBJECT
-    claims = _decode_claims(token)
-    if claims is None:
-        return ANONYMOUS_SUBJECT
-    sub = _string_claim(claims, "sub")
-    if sub is None:
-        return ANONYMOUS_SUBJECT
-    return SubjectContext(
-        issuer=_string_claim(claims, "iss") or UNKNOWN,
-        sub=sub,
-        role=_role_claim(claims) or UNKNOWN,
-        token_id=_string_claim(claims, "jti") or "",
-    )
+    if isinstance(auth, str):
+        scheme, _, token = auth.strip().partition(" ")
+        token = token.strip()
+        if scheme.lower() == "bearer" and token:
+            claims = _decode_claims(token)
+            if claims is not None:
+                sub = _string_claim(claims, "sub")
+                if sub is not None:
+                    return SubjectContext(
+                        issuer=_string_claim(claims, "iss") or UNKNOWN,
+                        sub=sub,
+                        role=_role_claim(claims) or UNKNOWN,
+                        token_id=_string_claim(claims, "jti") or "",
+                    )
+
+    # Check X-User-Sub / X-User-Roles fallback
+    user_sub = next((v for k, v in headers.items() if k.lower() == "x-user-sub"), None)
+    if isinstance(user_sub, str) and user_sub.strip():
+        user_roles = next((v for k, v in headers.items() if k.lower() == "x-user-roles"), "")
+        role = user_roles.split(",")[0].strip() if user_roles else UNKNOWN
+        issuer = next((v for k, v in headers.items() if k.lower() == "x-user-iss"), "gateway")
+        return SubjectContext(
+            issuer=issuer,
+            sub=user_sub.strip(),
+            role=role or UNKNOWN,
+            token_id="",
+        )
+
+    return ANONYMOUS_SUBJECT
 
 
 def extract_resource_context(path: str, method: str) -> tuple[str, str | None]:
@@ -112,10 +123,12 @@ def extract_resource_context(path: str, method: str) -> tuple[str, str | None]:
         segments.pop(0)
     if not segments:
         return UNKNOWN_RESOURCE, None
+    if clean.rstrip("/").endswith("/payments/webhook"):
+        return "orders", None
     resource_type = unquote(segments[0])
     if len(segments) < 2:
         return resource_type, None
     candidate = segments[1]
-    if _TEMPLATE_SEGMENT.match(candidate):
+    if _TEMPLATE_SEGMENT.match(candidate) or candidate.lower() in _NON_ID_SEGMENTS:
         return resource_type, None
     return resource_type, unquote(candidate)
