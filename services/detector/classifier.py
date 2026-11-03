@@ -156,4 +156,13 @@ def classify(
             expected_path=missing_ops + [op_template],
         )
 
-    return None
+    # 6. Rule R3: OUT_OF_ORDER (no source state reachable ahead)
+    return ClassificationResult(
+        is_violation=True,
+        label="OUT_OF_ORDER",
+        rule="R3",
+        secondary_label=None,
+        severity=severity,
+        missing=[],
+        expected_path=[],
+    )
