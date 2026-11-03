@@ -189,6 +189,12 @@ class EventInterceptorMiddleware(BaseHTTPMiddleware):
         try:
             subject = extract_subject_from_headers(request.headers)
             resource_type, resource_id = extract_resource_context(request.url.path, request.method)
+            for k, v in request.headers.items():
+                k_lower = k.lower()
+                if k_lower == "x-resource-type" and v:
+                    resource_type = v
+                elif k_lower in ("x-resource-id", "x-order-id") and v:
+                    resource_id = v
             if resource_id is None:
                 resource_id = _created_resource_id(response, resource_type)
             if (
