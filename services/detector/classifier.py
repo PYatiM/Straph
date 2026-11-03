@@ -10,6 +10,7 @@ from services.detector.store import InstanceRecord
 from services.detector.tables import ModelTables
 
 UUID_OR_ID_SEGMENT = re.compile(r"^[0-9a-fA-F\-]{4,}$|^[0-9]+$")
+CROSS_OBJECT_ROLES = {"support", "warehouse", "carrier", "payment-gateway", "admin"}
 
 
 def normalize_path(path: str) -> str:
@@ -61,6 +62,47 @@ class ClassificationResult:
     expected_path: list[str] = field(default_factory=list)
 
 
+def _compute_secondary_step(
+    instance: InstanceRecord,
+    tables: ModelTables,
+    op_template: str,
+    norm_path: str,
+) -> tuple[str, list[str], list[str]]:
+    """Compute secondary step label, missing ops, and expected path for R0 violations."""
+    valid_sources = tables.source_states.get(op_template, set())
+
+    # Legal advance
+    if instance.current_state in valid_sources:
+        target_key = (instance.current_state, op_template)
+        if target_key not in tables.target_states:
+            target_key = (instance.current_state, norm_path)
+        target = tables.target_states.get(target_key, instance.current_state)
+        label = "FULFILLED" if target == "FULFILLMENT_QUEUED" else target
+        return (label, [], [op_template])
+
+    # Replayed
+    is_one_shot = (op_template in tables.one_shot_ops) or (norm_path in tables.one_shot_ops)
+    if is_one_shot and history_has_op(instance.history, op_template, norm_path):
+        return ("REPLAYED", [], [])
+
+    # Skipped
+    reachable_ahead = tables.reachability.get(instance.current_state, set())
+    reachable_sources = [
+        s for s in valid_sources if s in reachable_ahead and s != instance.current_state
+    ]
+    if reachable_sources:
+        best_missing: list[str] | None = None
+        for s in reachable_sources:
+            path = tables.shortest_paths.get((instance.current_state, s))
+            if path is not None and (best_missing is None or len(path) < len(best_missing)):
+                best_missing = path
+        missing_ops = best_missing if best_missing is not None else []
+        return ("SKIPPED", missing_ops, missing_ops + [op_template])
+
+    # Out of order
+    return ("OUT_OF_ORDER", [], [])
+
+
 def classify(
     instance: InstanceRecord,
     event: dict[str, Any],
@@ -96,10 +138,55 @@ def classify(
     op_template = full_op if full_op in tables.source_states else norm_path
     status_code = int(event.get("status_code", 200))
     ts = str(event.get("ts_completed", event.get("ts_received", "")))
+    severity = "accepted" if 200 <= status_code < 300 else "attempted"
 
     # Synchronize initial state if instance starts at generic "START"
     if instance.current_state == "START" and tables.initial_state != "START":
         instance.current_state = tables.initial_state
+
+    # Extract subject info
+    caller_sub = str(event.get("subject", {}).get("sub", ""))
+    caller_role = str(event.get("subject", {}).get("role", ""))
+
+    # Bind owner on initial customer interaction if unbound
+    if instance.owner_subject in ("anonymous", "", None) and caller_role == "customer" and caller_sub:
+        instance.owner_subject = caller_sub
+
+    # 2. Rule R0: IDENTITY_MISMATCH (Evaluated BEFORE legality checks)
+    # Check 1: Caller is not instance owner and lacks cross-object role permission
+    if (
+        instance.owner_subject not in ("anonymous", "", None)
+        and caller_sub != instance.owner_subject
+        and caller_role not in CROSS_OBJECT_ROLES
+    ):
+        step_label, missing_ops, exp_path = _compute_secondary_step(
+            instance, tables, op_template, norm_path
+        )
+        return ClassificationResult(
+            is_violation=True,
+            label="IDENTITY_MISMATCH",
+            rule="R0",
+            secondary_label=step_label,
+            severity=severity,
+            missing=missing_ops,
+            expected_path=exp_path,
+        )
+
+    # Check 2: Caller role is not authorized for the requested operation
+    allowed_roles = tables.allowed_roles.get(op_template) or tables.allowed_roles.get(norm_path)
+    if allowed_roles and caller_role not in allowed_roles:
+        step_label, missing_ops, exp_path = _compute_secondary_step(
+            instance, tables, op_template, norm_path
+        )
+        return ClassificationResult(
+            is_violation=True,
+            label="IDENTITY_MISMATCH",
+            rule="R0",
+            secondary_label=step_label,
+            severity=severity,
+            missing=missing_ops,
+            expected_path=exp_path,
+        )
 
     # 3. Check Legal Advance
     valid_sources = tables.source_states.get(op_template, set())
@@ -116,9 +203,6 @@ def classify(
         # Non-2xx failed call preserves current state
         instance.history.append({"operation": op_template, "status": status_code, "ts": ts})
         return None
-
-    # Illegal transition from current state
-    severity = "accepted" if 200 <= status_code < 300 else "attempted"
 
     # 4. Rule R1: REPLAYED (one-shot operation executed again)
     is_one_shot = (op_template in tables.one_shot_ops) or (norm_path in tables.one_shot_ops)
