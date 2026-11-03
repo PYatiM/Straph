@@ -133,4 +133,27 @@ def classify(
             expected_path=[],
         )
 
+    # 5. Rule R2: SKIPPED (reachable source state ahead)
+    reachable_ahead = tables.reachability.get(instance.current_state, set())
+    reachable_sources = [
+        s for s in valid_sources if s in reachable_ahead and s != instance.current_state
+    ]
+    if reachable_sources:
+        best_missing: list[str] | None = None
+        for s in reachable_sources:
+            path = tables.shortest_paths.get((instance.current_state, s))
+            if path is not None and (best_missing is None or len(path) < len(best_missing)):
+                best_missing = path
+
+        missing_ops = best_missing if best_missing is not None else []
+        return ClassificationResult(
+            is_violation=True,
+            label="SKIPPED",
+            rule="R2",
+            secondary_label=None,
+            severity=severity,
+            missing=missing_ops,
+            expected_path=missing_ops + [op_template],
+        )
+
     return None
