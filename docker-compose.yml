@@ -81,6 +81,22 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      - kafka
+      - redis
+      - target-app
+    environment:
+      TARGET_APP_URL: http://target-app:8001
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_URL: redis://redis:6379/0
+    restart: unless-stopped
+
 volumes:
   kafka-data:
   redis-data:
