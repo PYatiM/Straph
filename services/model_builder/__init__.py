@@ -9,10 +9,13 @@ from services.model_builder.graph_queries import (
     is_state_reachable,
 )
 from services.model_builder.neo4j_loader import InMemoryGraphDriver, Neo4jModelLoader
+from services.model_builder.openapi_parser import CandidateOperation, OpenAPIParser
 
 __all__ = [
+    "CandidateOperation",
     "InMemoryGraphDriver",
     "Neo4jModelLoader",
+    "OpenAPIParser",
     "get_legal_transitions",
     "get_shortest_path",
     "get_source_states",
