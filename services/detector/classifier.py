@@ -34,6 +34,20 @@ def normalize_op_template(method: str, path_template: str) -> str:
     return f"{m} {norm_path}" if m else norm_path
 
 
+def history_has_op(history: list[dict[str, Any]], op_template: str, norm_path: str) -> bool:
+    """Check if instance history contains accepted occurrence of operation."""
+    for h in history:
+        h_op = h.get("operation")
+        if isinstance(h_op, str):
+            if h_op in (op_template, norm_path) or normalize_path(h_op) == norm_path:
+                return True
+        elif isinstance(h_op, dict):
+            h_path = normalize_path(str(h_op.get("path_template", "")))
+            if h_path == norm_path:
+                return True
+    return False
+
+
 @dataclass
 class ClassificationResult:
     """Result of classifying an API event against reference model."""
@@ -80,6 +94,8 @@ def classify(
 
     # Canonical operation key preferred for transitions and history
     op_template = full_op if full_op in tables.source_states else norm_path
+    status_code = int(event.get("status_code", 200))
+    ts = str(event.get("ts_completed", event.get("ts_received", "")))
 
     # Synchronize initial state if instance starts at generic "START"
     if instance.current_state == "START" and tables.initial_state != "START":
@@ -88,8 +104,6 @@ def classify(
     # 3. Check Legal Advance
     valid_sources = tables.source_states.get(op_template, set())
     if instance.current_state in valid_sources:
-        status_code = int(event.get("status_code", 200))
-        ts = str(event.get("ts_completed", event.get("ts_received", "")))
         if 200 <= status_code < 300:
             target_key = (instance.current_state, op_template)
             if target_key not in tables.target_states:
@@ -102,5 +116,21 @@ def classify(
         # Non-2xx failed call preserves current state
         instance.history.append({"operation": op_template, "status": status_code, "ts": ts})
         return None
+
+    # Illegal transition from current state
+    severity = "accepted" if 200 <= status_code < 300 else "attempted"
+
+    # 4. Rule R1: REPLAYED (one-shot operation executed again)
+    is_one_shot = (op_template in tables.one_shot_ops) or (norm_path in tables.one_shot_ops)
+    if is_one_shot and history_has_op(instance.history, op_template, norm_path):
+        return ClassificationResult(
+            is_violation=True,
+            label="REPLAYED",
+            rule="R1",
+            secondary_label=None,
+            severity=severity,
+            missing=[],
+            expected_path=[],
+        )
 
     return None
