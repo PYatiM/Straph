@@ -47,6 +47,7 @@ def test_known_operation_passes_r4(instance: InstanceRecord, tables: ModelTables
 
 def test_known_parameterized_operation_passes_r4(instance: InstanceRecord, tables: ModelTables) -> None:
     """Parameterized operation path /orders/1001/address matches /orders/{id}/address."""
+    instance.current_state = "ORDER_CREATED"
     event = {
         "event_id": "00000000-0000-4000-8000-000000000002",
         "operation": {"method": "PUT", "path_template": "/orders/1001/address"},

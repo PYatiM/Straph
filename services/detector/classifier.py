@@ -103,6 +103,29 @@ def _compute_secondary_step(
     return ("OUT_OF_ORDER", [], [])
 
 
+def _handle_violation_taint(
+    instance: InstanceRecord,
+    tables: ModelTables,
+    op_template: str,
+    norm_path: str,
+    status_code: int,
+    ts: str,
+    result: ClassificationResult,
+) -> ClassificationResult:
+    """Taint instance and resynchronize state on accepted violation."""
+    if 200 <= status_code < 300:
+        instance.tainted = True
+        # Find target state of the accepted operation across known transitions
+        for (_from_st, op_key), to_st in tables.target_states.items():
+            if op_key in (op_template, norm_path):
+                instance.current_state = to_st
+                break
+        instance.history.append({"operation": op_template, "status": status_code, "ts": ts, "tainted": True})
+    else:
+        instance.history.append({"operation": op_template, "status": status_code, "ts": ts, "tainted": False})
+    return result
+
+
 def classify(
     instance: InstanceRecord,
     event: dict[str, Any],
@@ -162,7 +185,7 @@ def classify(
         step_label, missing_ops, exp_path = _compute_secondary_step(
             instance, tables, op_template, norm_path
         )
-        return ClassificationResult(
+        res = ClassificationResult(
             is_violation=True,
             label="IDENTITY_MISMATCH",
             rule="R0",
@@ -171,6 +194,7 @@ def classify(
             missing=missing_ops,
             expected_path=exp_path,
         )
+        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
 
     # Check 2: Caller role is not authorized for the requested operation
     allowed_roles = tables.allowed_roles.get(op_template) or tables.allowed_roles.get(norm_path)
@@ -178,7 +202,7 @@ def classify(
         step_label, missing_ops, exp_path = _compute_secondary_step(
             instance, tables, op_template, norm_path
         )
-        return ClassificationResult(
+        res = ClassificationResult(
             is_violation=True,
             label="IDENTITY_MISMATCH",
             rule="R0",
@@ -187,6 +211,7 @@ def classify(
             missing=missing_ops,
             expected_path=exp_path,
         )
+        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
 
     # 3. Check Legal Advance
     valid_sources = tables.source_states.get(op_template, set())
@@ -207,7 +232,7 @@ def classify(
     # 4. Rule R1: REPLAYED (one-shot operation executed again)
     is_one_shot = (op_template in tables.one_shot_ops) or (norm_path in tables.one_shot_ops)
     if is_one_shot and history_has_op(instance.history, op_template, norm_path):
-        return ClassificationResult(
+        res = ClassificationResult(
             is_violation=True,
             label="REPLAYED",
             rule="R1",
@@ -216,6 +241,7 @@ def classify(
             missing=[],
             expected_path=[],
         )
+        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
 
     # 5. Rule R2: SKIPPED (reachable source state ahead)
     reachable_ahead = tables.reachability.get(instance.current_state, set())
@@ -230,7 +256,7 @@ def classify(
                 best_missing = path
 
         missing_ops = best_missing if best_missing is not None else []
-        return ClassificationResult(
+        res = ClassificationResult(
             is_violation=True,
             label="SKIPPED",
             rule="R2",
@@ -239,9 +265,10 @@ def classify(
             missing=missing_ops,
             expected_path=missing_ops + [op_template],
         )
+        return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)
 
     # 6. Rule R3: OUT_OF_ORDER (no source state reachable ahead)
-    return ClassificationResult(
+    res = ClassificationResult(
         is_violation=True,
         label="OUT_OF_ORDER",
         rule="R3",
@@ -250,3 +277,4 @@ def classify(
         missing=[],
         expected_path=[],
     )
+    return _handle_violation_taint(instance, tables, op_template, norm_path, status_code, ts, res)

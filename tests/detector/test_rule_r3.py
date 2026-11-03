@@ -82,17 +82,20 @@ def test_partition_proposition_r2_r3(tables: ModelTables) -> None:
             if canonical_op in tables.one_shot_ops:
                 continue
 
+            allowed = list(tables.allowed_roles.get(canonical_op, ["customer"]))
+            role = allowed[0]
+
             instance = InstanceRecord(
                 resource_type="Order",
                 resource_id="prop_test",
                 current_state=state,
-                owner_subject="customer",
+                owner_subject="user-prop",
             )
             event = {
                 "event_id": "00000000-0000-4000-8000-000000000001",
                 "operation": {"method": method, "path_template": path},
                 "status_code": 200,
-                "subject": {"sub": "customer", "role": "customer"},
+                "subject": {"sub": "user-prop", "role": role},
             }
 
             result = classify(instance, event, tables)
