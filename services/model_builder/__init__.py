@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from services.model_builder.cache import InMemoryModelGraph
 from services.model_builder.graph_queries import (
     get_legal_transitions,
     get_shortest_path,
@@ -15,6 +16,7 @@ from services.model_builder.session_grouper import group_events_by_object
 __all__ = [
     "CandidateOperation",
     "InMemoryGraphDriver",
+    "InMemoryModelGraph",
     "Neo4jModelLoader",
     "OpenAPIParser",
     "get_legal_transitions",
