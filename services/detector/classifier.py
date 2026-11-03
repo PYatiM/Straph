@@ -163,6 +163,18 @@ def classify(
     ts = str(event.get("ts_completed", event.get("ts_received", "")))
     severity = "accepted" if 200 <= status_code < 300 else "attempted"
 
+    # Idempotency handling
+    raw_idem_key = event.get("idempotency_key")
+    is_retry = False
+    if raw_idem_key:
+        idem_key = str(raw_idem_key)
+        key_with_op = f"{idem_key}:{op_template}"
+        if key_with_op in instance.idempotency_keys or idem_key in instance.idempotency_keys:
+            is_retry = True
+        else:
+            instance.idempotency_keys.add(key_with_op)
+            instance.idempotency_keys.add(idem_key)
+
     # Synchronize initial state if instance starts at generic "START"
     if instance.current_state == "START" and tables.initial_state != "START":
         instance.current_state = tables.initial_state
@@ -227,6 +239,10 @@ def classify(
 
         # Non-2xx failed call preserves current state
         instance.history.append({"operation": op_template, "status": status_code, "ts": ts})
+        return None
+
+    # If this was an idempotent retry of an already completed or advanced operation, return None
+    if is_retry:
         return None
 
     # 4. Rule R1: REPLAYED (one-shot operation executed again)
