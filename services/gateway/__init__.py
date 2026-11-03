@@ -17,6 +17,7 @@ from services.gateway.rate_limiter import (
     RateLimiterValidationError,
     RedisFixedWindowRateLimiter,
 )
+from services.gateway.streaming import StreamTap
 
 __all__ = [
     "AsyncKafkaConsumer",
@@ -26,6 +27,7 @@ __all__ = [
     "RateLimiterProtocol",
     "RateLimiterValidationError",
     "RedisFixedWindowRateLimiter",
+    "StreamTap",
     "create_gateway_app",
     "extract_caller_sub",
     "extract_client_ip",
