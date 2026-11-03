@@ -78,4 +78,29 @@ def classify(
             expected_path=[],
         )
 
+    # Canonical operation key preferred for transitions and history
+    op_template = full_op if full_op in tables.source_states else norm_path
+
+    # Synchronize initial state if instance starts at generic "START"
+    if instance.current_state == "START" and tables.initial_state != "START":
+        instance.current_state = tables.initial_state
+
+    # 3. Check Legal Advance
+    valid_sources = tables.source_states.get(op_template, set())
+    if instance.current_state in valid_sources:
+        status_code = int(event.get("status_code", 200))
+        ts = str(event.get("ts_completed", event.get("ts_received", "")))
+        if 200 <= status_code < 300:
+            target_key = (instance.current_state, op_template)
+            if target_key not in tables.target_states:
+                target_key = (instance.current_state, norm_path)
+            new_state = tables.target_states[target_key]
+            instance.current_state = new_state
+            instance.history.append({"operation": op_template, "status": status_code, "ts": ts})
+            return None
+
+        # Non-2xx failed call preserves current state
+        instance.history.append({"operation": op_template, "status": status_code, "ts": ts})
+        return None
+
     return None
