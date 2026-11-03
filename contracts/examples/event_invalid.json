@@ -1,1 +1,11 @@
-{"event_id": "e-000124", "ts_completed": "2026-10-13T09:00:01Z", "identity": "user-A", "role": "customer", "method": "FETCH", "path_template": "orders/1042", "status": 99}
+{
+  "event_id": "e-000124",
+  "ts_completed": "2026-10-13T09:00:01Z",
+  "subject": {"issuer": "https://idp.example.com", "sub": "user-A"},
+  "session_id": "s-a1",
+  "token_id": "tok-a1",
+  "operation": {"method": "FETCH", "path_template": "orders/1042"},
+  "resource_type": "Order",
+  "resource_id": 1042,
+  "status_code": 99
+}

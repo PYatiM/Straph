@@ -1,1 +1,13 @@
-{"event_id": "e-000123", "ts_received": "2026-10-13T09:00:00.120Z", "ts_completed": "2026-10-13T09:00:00.180Z", "session_id": "s-a1", "token_id": "tok-a1", "identity": "user-A", "role": "customer", "method": "POST", "path_template": "/orders/{id}/payment", "resource_type": "Order", "resource_id": "1042", "status": 202}
+{
+  "event_id": "3f2b8c1e-5d4a-4b7e-9a1c-0e6f2d8b7a41",
+  "ts_received": "2026-10-13T09:00:00.120Z",
+  "ts_completed": "2026-10-13T09:00:00.180Z",
+  "subject": {"issuer": "https://idp.example.com", "sub": "user-A", "role": "customer"},
+  "session_id": "s-a1",
+  "token_id": "tok-a1",
+  "operation": {"method": "POST", "path_template": "/orders/{id}/payment"},
+  "resource_type": "Order",
+  "resource_id": "1042",
+  "status_code": 202,
+  "idempotency_key": null
+}

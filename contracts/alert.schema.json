@@ -114,6 +114,11 @@
       "type": "string",
       "minLength": 1
     },
+    "secondary_label": {
+      "description": "Optional result of the secondary step transition computed alongside a primary R0 violation (e.g. the state reached, such as CANCELLED).",
+      "type": ["string", "null"],
+      "minLength": 1
+    },
     "rank_score": {
       "type": ["number", "null"],
       "minimum": 0.0,

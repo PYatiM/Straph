@@ -320,3 +320,36 @@ def test_reject_incomplete_flags(
     payload: dict[str, Any] = copy.deepcopy(valid_alert_payload)
     del payload["flags"][missing_flag]
     assert not alert_validator.is_valid(payload)
+
+
+@pytest.mark.parametrize("secondary_label", ["CANCELLED", None])
+def test_optional_secondary_label_passes(
+    alert_validator: Draft202012Validator,
+    valid_alert_payload: dict[str, Any],
+    secondary_label: str | None,
+) -> None:
+    """Verify secondary_label accepts a non-empty string or null."""
+    payload: dict[str, Any] = copy.deepcopy(valid_alert_payload)
+    payload["secondary_label"] = secondary_label
+    assert alert_validator.is_valid(payload)
+
+
+@pytest.mark.parametrize("bad_secondary_label", ["", 5, ["CANCELLED"]])
+def test_reject_invalid_secondary_label(
+    alert_validator: Draft202012Validator,
+    valid_alert_payload: dict[str, Any],
+    bad_secondary_label: Any,
+) -> None:
+    """Ensure secondary_label rejects empty strings and non-string values."""
+    payload: dict[str, Any] = copy.deepcopy(valid_alert_payload)
+    payload["secondary_label"] = bad_secondary_label
+    assert not alert_validator.is_valid(payload)
+
+
+def test_secondary_label_not_required(
+    alert_validator: Draft202012Validator,
+    valid_alert_payload: dict[str, Any],
+) -> None:
+    """Ensure secondary_label is optional (absent from the base payload)."""
+    assert "secondary_label" not in valid_alert_payload
+    assert alert_validator.is_valid(valid_alert_payload)

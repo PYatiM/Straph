@@ -1,0 +1,20 @@
+{
+  "event_id": "550e8400-e29b-41d4-a716-446655440000",
+  "ts_received": "2026-10-31T10:00:00Z",
+  "ts_completed": "2026-10-31T10:00:01Z",
+  "subject": {
+    "issuer": "straph-auth",
+    "sub": "user-123",
+    "role": "customer"
+  },
+  "session_id": "session-abc123",
+  "token_id": "token-xyz789",
+  "operation": {
+    "method": "POST",
+    "path_template": "/orders/{order_id}/fulfill"
+  },
+  "resource_type": "order",
+  "resource_id": "order-1005",
+  "idempotency_key": "idem-550e8400",
+  "status_code": 200
+}

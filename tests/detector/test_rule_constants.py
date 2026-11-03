@@ -99,4 +99,3 @@ def test_enums_consistent_with_alert_schema() -> None:
     assert {label.value for label in ViolationLabel} == schema_labels
     assert {rule.value for rule in RuleId} == schema_rules
     assert {sev.value for sev in SeverityLevel} == schema_severities
-
