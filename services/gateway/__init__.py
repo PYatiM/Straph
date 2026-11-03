@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from services.gateway.app import create_gateway_app
+from services.gateway.consumer import AsyncKafkaConsumer
 from services.gateway.rate_limit_middleware import (
     RateLimitMiddleware,
     extract_caller_sub,
@@ -18,6 +19,7 @@ from services.gateway.rate_limiter import (
 )
 
 __all__ = [
+    "AsyncKafkaConsumer",
     "InMemoryTokenBucketRateLimiter",
     "RateLimitMiddleware",
     "RateLimiterError",
