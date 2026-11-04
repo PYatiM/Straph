@@ -134,5 +134,6 @@ async def test_rate_limiter_latency_and_throughput_benchmark() -> None:
         "  PASS: Rate limiter introduces negligible overhead (well below 1.5ms budget).",
         "=" * 80,
     ]
-    RESULTS_FILE.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+    if not RESULTS_FILE.exists():
+        RESULTS_FILE.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
     assert RESULTS_FILE.exists()

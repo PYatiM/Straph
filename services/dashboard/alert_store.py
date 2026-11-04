@@ -40,10 +40,17 @@ class SQLiteAlertStore:
                     resource_type TEXT NOT NULL,
                     resource_id TEXT NOT NULL,
                     rank_score REAL,
-                    alert_json TEXT NOT NULL
+                    alert_json TEXT,
+                    raw_json TEXT
                 )
                 """
             )
+            cursor = self._conn.execute("PRAGMA table_info(alerts)")
+            cols = {row[1] for row in cursor.fetchall()}
+            if "alert_json" not in cols:
+                self._conn.execute("ALTER TABLE alerts ADD COLUMN alert_json TEXT")
+            if "raw_json" not in cols:
+                self._conn.execute("ALTER TABLE alerts ADD COLUMN raw_json TEXT")
             self._conn.execute("CREATE INDEX IF NOT EXISTS idx_dash_alerts_label ON alerts(label)")
             self._conn.execute("CREATE INDEX IF NOT EXISTS idx_dash_alerts_rule ON alerts(rule)")
             self._conn.execute(
@@ -58,14 +65,15 @@ class SQLiteAlertStore:
         res_id = resource.get("id", "")
         rank = alert.get("rank_score")
         rank_val = float(rank) if rank is not None else None
+        serialized = json.dumps(alert)
 
         with self._lock:
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO alerts (
                     alert_id, event_id, timestamp, label, rule, severity,
-                    resource_type, resource_id, rank_score, alert_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    resource_type, resource_id, rank_score, alert_json, raw_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(alert.get("alert_id")),
@@ -77,7 +85,8 @@ class SQLiteAlertStore:
                     res_type,
                     res_id,
                     rank_val,
-                    json.dumps(alert),
+                    serialized,
+                    serialized,
                 ),
             )
             self._conn.commit()
@@ -92,7 +101,7 @@ class SQLiteAlertStore:
         resource_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Retrieve alerts filtered by criteria and ordered by priority and time."""
-        query = "SELECT alert_json FROM alerts WHERE 1=1"
+        query = "SELECT COALESCE(alert_json, raw_json) AS payload_json FROM alerts WHERE 1=1"
         params: list[Any] = []
 
         if label is not None:
@@ -122,18 +131,58 @@ class SQLiteAlertStore:
             cursor = self._conn.execute(query, params)
             rows = cursor.fetchall()
 
-        return [json.loads(row["alert_json"]) for row in rows]
+        return [json.loads(row["payload_json"]) for row in rows if row["payload_json"] is not None]
+
+    def query_alerts(
+        self,
+        label: str | None = None,
+        rule: str | None = None,
+        min_rank: float | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Query alerts by label, rule, or min_rank, returning deserialized dictionaries."""
+        query = "SELECT COALESCE(alert_json, raw_json) AS payload_json FROM alerts WHERE 1=1"
+        params: list[Any] = []
+
+        if label is not None:
+            query += " AND label = ?"
+            params.append(str(label))
+
+        if rule is not None:
+            query += " AND rule = ?"
+            params.append(str(rule))
+
+        if min_rank is not None:
+            query += " AND rank_score IS NOT NULL AND rank_score >= ?"
+            params.append(float(min_rank))
+
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(int(limit))
+
+        with self._lock:
+            cursor = self._conn.execute(query, params)
+            rows = cursor.fetchall()
+
+        return [json.loads(row["payload_json"]) for row in rows if row["payload_json"] is not None]
 
     def get_alert(self, alert_id: str) -> dict[str, Any] | None:
         """Retrieve a single alert by alert_id."""
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT alert_json FROM alerts WHERE alert_id = ?", (alert_id,)
+                "SELECT COALESCE(alert_json, raw_json) AS payload_json FROM alerts WHERE alert_id = ?",
+                (alert_id,),
             )
             row = cursor.fetchone()
-        if row:
-            return json.loads(row["alert_json"])
+        if row and row["payload_json"] is not None:
+            return json.loads(row["payload_json"])
         return None
+
+    def count(self) -> int:
+        """Return total alerts stored."""
+        with self._lock:
+            cursor = self._conn.execute("SELECT COUNT(*) FROM alerts")
+            row = cursor.fetchone()
+            return int(row[0]) if row is not None else 0
 
     def clear(self) -> None:
         """Clear all stored alerts."""

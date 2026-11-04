@@ -17,6 +17,7 @@ import time
 from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
+import redis.asyncio as aioredis
 from redis.exceptions import RedisError
 
 __all__ = [
@@ -267,10 +268,12 @@ class RedisFixedWindowRateLimiter:
 
     def __init__(
         self,
-        redis_client: Any,
+        redis_client: Any = None,
         max_requests: int = 100,
         window_sec: int = 60,
         *,
+        redis_url: str | None = None,
+        window_seconds: int | None = None,
         key_prefix: str = "rate_limit:",
         time_func: Callable[[], float] | None = None,
     ) -> None:
@@ -280,24 +283,33 @@ class RedisFixedWindowRateLimiter:
             redis_client: Asynchronous Redis client instance (e.g. redis.asyncio.Redis).
             max_requests: Maximum allowed requests within the window. Must be a positive integer.
             window_sec: Window duration in seconds. Must be a positive integer.
+            redis_url: Optional Redis connection URL used when redis_client is None.
+            window_seconds: Optional alias for window_sec.
             key_prefix: Prefix namespace for keys stored in Redis.
             time_func: Optional callable returning current epoch time in seconds. Defaults to time.time.
 
         Raises:
             RateLimiterValidationError: If configuration parameters fail validation.
         """
+        if redis_client is None and redis_url is not None:
+            if not isinstance(redis_url, str) or not redis_url.strip():
+                raise RateLimiterValidationError("redis_url must be a non-empty string")
+            redis_client = aioredis.Redis.from_url(redis_url, decode_responses=True)
+
         if redis_client is None:
             raise RateLimiterValidationError("redis_client must not be None")
 
+        effective_window = window_seconds if window_seconds is not None else window_sec
+
         self._validate_int(max_requests, "max_requests")
-        self._validate_int(window_sec, "window_sec")
+        self._validate_int(effective_window, "window_sec")
 
         if not isinstance(key_prefix, str):
             raise RateLimiterValidationError("key_prefix must be a string")
 
         self.redis_client: Any = redis_client
         self.max_requests: int = int(max_requests)
-        self.window_sec: int = int(window_sec)
+        self.window_sec: int = int(effective_window)
         self.key_prefix: str = key_prefix
         self._time_func: Callable[[], float] = time_func if time_func is not None else time.time
 
