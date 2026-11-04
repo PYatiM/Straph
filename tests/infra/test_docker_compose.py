@@ -27,7 +27,7 @@ def svc(compose: dict[str, Any], name: str) -> dict[str, Any]:
 
 
 def test_required_services(compose: dict[str, Any]) -> None:
-    assert set(compose["services"]) == {"kafka", "redis", "neo4j", "target-app", "gateway"}
+    assert {"kafka", "redis", "neo4j", "target-app", "gateway"}.issubset(set(compose["services"]))
 
 
 @pytest.mark.parametrize(

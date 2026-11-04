@@ -130,3 +130,23 @@ class AlertScoringService:
             raise TypeError(f"Unsupported message type: {type(message).__name__}")
 
         return self.score_alert(payload)
+
+
+if __name__ == "__main__":
+    import os
+    import time
+
+    logging.basicConfig(level=logging.INFO)
+    db_path = os.getenv("ALERTS_DB_PATH", ":memory:")
+    alert_store = SQLiteAlertStore(db_path)
+    ranker_svc = AlertScoringService(alert_store=alert_store)
+    log.info("AlertScoringService started listening on SQLite alert store %s", db_path)
+
+    try:
+        while True:
+            scored = ranker_svc.score_unranked_alerts()
+            if scored:
+                log.info("Scored %d pending unranked alerts", len(scored))
+            time.sleep(1)
+    except KeyboardInterrupt:
+        log.info("Shutting down AlertScoringService.")
