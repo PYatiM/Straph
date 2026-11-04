@@ -9,15 +9,19 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from services.dashboard.alert_store import SQLiteAlertStore
+from services.dashboard.filters import AlertFilterEngine
 from services.detector.store import InMemoryInstanceStore
 
 log = logging.getLogger("straph.dashboard.app")
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 ALERT_SCHEMA_PATH = ROOT_DIR / "contracts" / "alert.schema.json"
+TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 __all__ = [
     "app",
@@ -42,6 +46,7 @@ def create_dashboard_app(
     store = alert_store or SQLiteAlertStore(os.getenv("ALERTS_DB_PATH", ":memory:"))
     instances = instance_store or InMemoryInstanceStore()
     alert_schema = schema or _load_alert_schema()
+    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
     app = FastAPI(
         title="Straph Security Dashboard API",
@@ -50,6 +55,7 @@ def create_dashboard_app(
     app.state.alert_store = store
     app.state.instance_store = instances
     app.state.alert_schema = alert_schema
+    app.state.templates = templates
 
     def _validate_alert(alert: dict[str, Any]) -> None:
         """Validate alert against contracts/alert.schema.json before sending."""
@@ -122,6 +128,40 @@ def create_dashboard_app(
             "owner_subject": record.owner_subject,
             "history_length": len(record.history),
         }
+
+    @app.get("/ui", response_class=HTMLResponse)
+    def ui_triage(
+        request: Request,
+        label: str | None = Query(default=None),
+        rule: str | None = Query(default=None),
+        min_rank: float | None = Query(default=None),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=50, ge=1, le=1000),
+    ) -> Response:
+        """Server-side rendered HTML alert triage table with badges, filtering, and XSS safety."""
+        s: SQLiteAlertStore = request.app.state.alert_store
+        clean_label = label if label and label.strip() else None
+        clean_rule = rule if rule and rule.strip() else None
+
+        alerts, total = AlertFilterEngine.apply_filters(
+            conn=s._conn,
+            label=clean_label,
+            rule=clean_rule,
+            min_rank=min_rank,
+            offset=offset,
+            limit=limit,
+        )
+        return request.app.state.templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "alerts": alerts,
+                "total": total,
+                "selected_label": clean_label,
+                "selected_rule": clean_rule,
+                "selected_min_rank": min_rank,
+            },
+        )
 
     return app
 

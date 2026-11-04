@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Straph Security Alerts Triage</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --badge-accepted: #dc2626;
+            --badge-attempted: #d97706;
+            --badge-tainted: #7c3aed;
+            --primary-accent: #3b82f6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .filter-bar {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .filter-group label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        select, input, button {
+            background-color: #0f172a;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        button {
+            background-color: var(--primary-accent);
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            padding: 8px 18px;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .table-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+        th {
+            background-color: #111827;
+            padding: 12px 16px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+        tr:hover {
+            background-color: #273549;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-accepted {
+            background-color: var(--badge-accepted);
+            color: #fff;
+        }
+        .badge-attempted {
+            background-color: var(--badge-attempted);
+            color: #fff;
+        }
+        .badge-tainted {
+            background-color: var(--badge-tainted);
+            color: #fff;
+            margin-left: 4px;
+        }
+        .rank-pill {
+            font-family: monospace;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+        a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .empty-state {
+            padding: 32px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Straph Security Alerts Triage</h1>
+
+        <form class="filter-bar" method="GET" action="/ui">
+            <div class="filter-group">
+                <label for="label-select">Label</label>
+                <select id="label-select" name="label">
+                    <option value="" {% if not selected_label %}selected{% endif %}>All Labels</option>
+                    <option value="SKIPPED" {% if selected_label == "SKIPPED" %}selected{% endif %}>SKIPPED</option>
+                    <option value="OUT_OF_ORDER" {% if selected_label == "OUT_OF_ORDER" %}selected{% endif %}>OUT_OF_ORDER</option>
+                    <option value="REPLAYED" {% if selected_label == "REPLAYED" %}selected{% endif %}>REPLAYED</option>
+                    <option value="IDENTITY_MISMATCH" {% if selected_label == "IDENTITY_MISMATCH" %}selected{% endif %}>IDENTITY_MISMATCH</option>
+                    <option value="UNMODELED" {% if selected_label == "UNMODELED" %}selected{% endif %}>UNMODELED</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="rule-select">Rule</label>
+                <select id="rule-select" name="rule">
+                    <option value="" {% if not selected_rule %}selected{% endif %}>All Rules</option>
+                    <option value="R0" {% if selected_rule == "R0" %}selected{% endif %}>R0 (Identity / BOLA)</option>
+                    <option value="R1" {% if selected_rule == "R1" %}selected{% endif %}>R1 (Replayed)</option>
+                    <option value="R2" {% if selected_rule == "R2" %}selected{% endif %}>R2 (Skipped)</option>
+                    <option value="R3" {% if selected_rule == "R3" %}selected{% endif %}>R3 (Out of Order)</option>
+                    <option value="R4" {% if selected_rule == "R4" %}selected{% endif %}>R4 (Unmodeled)</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="rank-select">Min Rank Score</label>
+                <select id="rank-select" name="min_rank">
+                    <option value="" {% if selected_min_rank is none %}selected{% endif %}>All Scores</option>
+                    <option value="0.5" {% if selected_min_rank == 0.5 %}selected{% endif %}>&ge; 0.5</option>
+                    <option value="0.7" {% if selected_min_rank == 0.7 %}selected{% endif %}>&ge; 0.7</option>
+                    <option value="0.8" {% if selected_min_rank == 0.8 %}selected{% endif %}>&ge; 0.8</option>
+                    <option value="0.9" {% if selected_min_rank == 0.9 %}selected{% endif %}>&ge; 0.9</option>
+                </select>
+            </div>
+
+            <button type="submit">Filter Alerts</button>
+        </form>
+
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ALERT ID</th>
+                        <th>TIMESTAMP</th>
+                        <th>LABEL</th>
+                        <th>RULE</th>
+                        <th>SEVERITY</th>
+                        <th>RESOURCE</th>
+                        <th>OWASP CLASS</th>
+                        <th>RANK SCORE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr>
+                        <td>
+                            <a href="/ui/alerts/{{ alert.alert_id | e }}">{{ alert.alert_id | e }}</a>
+                        </td>
+                        <td>{{ alert.timestamp | e }}</td>
+                        <td><strong>{{ alert.label | e }}</strong></td>
+                        <td>{{ alert.rule | e }}</td>
+                        <td>
+                            {% if alert.severity == "accepted" %}
+                            <span class="badge badge-accepted">accepted</span>
+                            {% else %}
+                            <span class="badge badge-attempted">attempted</span>
+                            {% endif %}
+                            {% if alert.flags and alert.flags.tainted %}
+                            <span class="badge badge-tainted">tainted</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.resource.type | e }}:{{ alert.resource.id | e }}</td>
+                        <td>{{ alert.owasp_class | e }}</td>
+                        <td class="rank-pill">
+                            {% if alert.rank_score is not none %}
+                            {{ "%.3f" | format(alert.rank_score) }}
+                            {% else %}
+                            &mdash;
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="empty-state">No alerts match the selected criteria.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
