@@ -12,6 +12,7 @@ import jsonschema
 from fastapi import FastAPI, HTTPException, Query, Request
 
 from services.dashboard.alert_store import SQLiteAlertStore
+from services.detector.store import InMemoryInstanceStore
 
 log = logging.getLogger("straph.dashboard.app")
 
@@ -34,16 +35,20 @@ def _load_alert_schema() -> dict[str, Any]:
 
 def create_dashboard_app(
     alert_store: SQLiteAlertStore | None = None,
+    instance_store: InMemoryInstanceStore | None = None,
     schema: dict[str, Any] | None = None,
 ) -> FastAPI:
     """Factory for the read-only Dashboard FastAPI application."""
     store = alert_store or SQLiteAlertStore(os.getenv("ALERTS_DB_PATH", ":memory:"))
+    instances = instance_store or InMemoryInstanceStore()
     alert_schema = schema or _load_alert_schema()
 
     app = FastAPI(
-        title="Straph Security Dashboard API", description="Read-only security alert triage API"
+        title="Straph Security Dashboard API",
+        description="Read-only security alert and instance state inspection API",
     )
     app.state.alert_store = store
+    app.state.instance_store = instances
     app.state.alert_schema = alert_schema
 
     def _validate_alert(alert: dict[str, Any]) -> None:
@@ -94,6 +99,29 @@ def create_dashboard_app(
             raise HTTPException(status_code=404, detail="Alert not found")
         _validate_alert(alert)
         return alert
+
+    @app.get("/instances/{resource_type}/{resource_id}")
+    def get_instance_state(
+        resource_type: str,
+        resource_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        """Query real-time state and taint status of an active business object instance."""
+        inst_store: InMemoryInstanceStore = request.app.state.instance_store
+        record = inst_store.get(resource_type, resource_id)
+        if record is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Instance {resource_type}:{resource_id} not found",
+            )
+        return {
+            "resource_type": record.resource_type,
+            "resource_id": record.resource_id,
+            "current_state": record.current_state,
+            "tainted": bool(record.tainted),
+            "owner_subject": record.owner_subject,
+            "history_length": len(record.history),
+        }
 
     return app
 
