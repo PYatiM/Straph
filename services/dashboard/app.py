@@ -163,6 +163,21 @@ def create_dashboard_app(
             },
         )
 
+    @app.get("/ui/alerts/{alert_id}", response_class=HTMLResponse)
+    def ui_alert_detail(alert_id: str, request: Request) -> Response:
+        """Render detailed alert explanation card with expected vs observed vs missing diffs."""
+        s: SQLiteAlertStore = request.app.state.alert_store
+        alert = s.get_alert(alert_id)
+        if alert is None:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        return request.app.state.templates.TemplateResponse(
+            request=request,
+            name="detail.html",
+            context={
+                "alert": alert,
+            },
+        )
+
     return app
 
 
