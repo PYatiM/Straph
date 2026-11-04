@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert Explanation &bull; {{ alert.alert_id | e }}</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --badge-accepted: #dc2626;
+            --badge-attempted: #d97706;
+            --badge-tainted: #7c3aed;
+            --danger-bg: rgba(220, 38, 38, 0.15);
+            --danger-border: #dc2626;
+            --step-bg: #0f172a;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #60a5fa;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        .card-header {
+            padding: 20px 24px;
+            background-color: #111827;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .alert-title {
+            font-size: 18px;
+            font-weight: 700;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .header-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+        .meta-item strong {
+            color: var(--text-primary);
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-accepted {
+            background-color: var(--badge-accepted);
+            color: #fff;
+        }
+        .badge-attempted {
+            background-color: var(--badge-attempted);
+            color: #fff;
+        }
+        .badge-tainted {
+            background-color: var(--badge-tainted);
+            color: #fff;
+        }
+        .card-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .breadcrumbs-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .breadcrumb-step {
+            background-color: var(--step-bg);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .breadcrumb-arrow {
+            color: var(--text-secondary);
+            font-weight: bold;
+        }
+        .observed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            background-color: var(--step-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .grid-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .grid-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .grid-value {
+            font-size: 14px;
+            font-family: monospace;
+            font-weight: 600;
+        }
+        .missing-box {
+            background-color: var(--danger-bg);
+            border: 1px solid var(--danger-border);
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .missing-header {
+            color: #f87171;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .missing-list {
+            margin: 0;
+            padding-left: 20px;
+            color: #fca5a5;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .missing-list li {
+            margin-bottom: 4px;
+        }
+        .warning-icon {
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a class="back-link" href="/ui">&larr; Back to Triage Dashboard</a>
+
+        <div class="card">
+            <!-- Header: Alert ID, Rule, OWASP Category, Severity -->
+            <div class="card-header">
+                <div class="header-top">
+                    <div class="alert-title">{{ alert.alert_id | e }}</div>
+                    <div>
+                        {% if alert.severity == "accepted" %}
+                        <span class="badge badge-accepted">accepted</span>
+                        {% else %}
+                        <span class="badge badge-attempted">attempted</span>
+                        {% endif %}
+                        {% if alert.flags and alert.flags.tainted %}
+                        <span class="badge badge-tainted">tainted</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="header-meta">
+                    <div class="meta-item">Rule: <strong>{{ alert.rule | e }}</strong> ({{ alert.label | e }})</div>
+                    <div class="meta-item">OWASP Category: <strong>{{ alert.owasp_class | e }}</strong></div>
+                    <div class="meta-item">Severity: <strong>{{ alert.severity | e }}</strong></div>
+                    <div class="meta-item">Resource: <strong>{{ alert.resource.type | e }}:{{ alert.resource.id | e }}</strong></div>
+                    <div class="meta-item">Timestamp: <strong>{{ alert.timestamp | e }}</strong></div>
+                    {% if alert.rank_score is not none %}
+                    <div class="meta-item">Priority Score: <strong>{{ "%.3f" | format(alert.rank_score) }}</strong></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card-body">
+                <!-- Section: Expected Path -->
+                <div>
+                    <div class="section-title">Expected Path</div>
+                    <div class="breadcrumbs-container">
+                        {% for step in alert.expected_path %}
+                        <div class="breadcrumb-step">{{ step | e }}</div>
+                        {% if not loop.last %}
+                        <span class="breadcrumb-arrow">&rarr;</span>
+                        {% endif %}
+                        {% else %}
+                        <div class="breadcrumb-step" style="color: var(--text-secondary);">&mdash; None specified &mdash;</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Section: Observed -->
+                <div>
+                    <div class="section-title">Observed</div>
+                    <div class="observed-grid">
+                        <div class="grid-item">
+                            <span class="grid-label">Offending Operation</span>
+                            <span class="grid-value">{{ alert.observed.operation | e }}</span>
+                        </div>
+                        <div class="grid-item">
+                            <span class="grid-label">Current State</span>
+                            <span class="grid-value">{{ alert.observed.state | default("START", true) | e }}</span>
+                        </div>
+                        <div class="grid-item">
+                            <span class="grid-label">HTTP Status Code</span>
+                            <span class="grid-value">{{ alert.observed.status_code | e }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Missing Operations -->
+                <div>
+                    <div class="section-title">Missing Operations</div>
+                    {% if alert.missing %}
+                    <div class="missing-box">
+                        <div class="missing-header">
+                            <span class="warning-icon">&#9888;</span>
+                            <span>The following required operation(s) were bypassed prior to this event:</span>
+                        </div>
+                        <ul class="missing-list">
+                            {% for op in alert.missing %}
+                            <li>{{ op | e }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% else %}
+                    <div style="color: var(--text-secondary); font-size: 13px;">Zero missing operations for this alert rule.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

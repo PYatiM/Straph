@@ -97,7 +97,33 @@ services:
       REDIS_URL: redis://redis:6379/0
     restart: unless-stopped
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: services/dashboard/Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      ALERTS_DB_PATH: /data/alerts.db
+    volumes:
+      - alerts-data:/data
+    restart: unless-stopped
+
+  ranker:
+    build:
+      context: .
+      dockerfile: services/ranker/Dockerfile
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ALERTS_DB_PATH: /data/alerts.db
+    volumes:
+      - alerts-data:/data
+    restart: unless-stopped
+
 volumes:
   kafka-data:
   redis-data:
   neo4j-data:
+  alerts-data:
