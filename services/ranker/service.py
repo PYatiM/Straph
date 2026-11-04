@@ -29,11 +29,11 @@ class AlertScoringService:
     def __init__(
         self,
         ranker: GBDTRanker | None = None,
-        alert_store: SQLiteAlertStore | None = None,
+        alert_store: Any | None = None,
         clean_stats: dict[str, Any] | None = None,
     ) -> None:
         self.ranker: GBDTRanker | None = ranker
-        self.alert_store: SQLiteAlertStore | None = alert_store
+        self.alert_store: Any | None = alert_store
         self.clean_stats: dict[str, Any] = dict(clean_stats) if clean_stats is not None else {}
 
     def score_alert(
@@ -103,13 +103,22 @@ class AlertScoringService:
             raise RuntimeError("SQLiteAlertStore must be configured to score unranked alerts.")
 
         with self.alert_store._lock:
+            info_cur = self.alert_store._conn.execute("PRAGMA table_info(alerts)")
+            cols = {row[1] for row in info_cur.fetchall()}
+            if "raw_json" in cols and "alert_json" in cols:
+                json_expr = "COALESCE(raw_json, alert_json)"
+            elif "raw_json" in cols:
+                json_expr = "raw_json"
+            else:
+                json_expr = "alert_json"
+
             cursor = self.alert_store._conn.execute(
-                "SELECT raw_json FROM alerts WHERE rank_score IS NULL ORDER BY timestamp ASC LIMIT ?",
+                f"SELECT {json_expr} FROM alerts WHERE rank_score IS NULL ORDER BY timestamp ASC LIMIT ?",
                 (limit,),
             )
             rows = cursor.fetchall()
 
-        unranked_alerts = [json.loads(row[0]) for row in rows]
+        unranked_alerts = [json.loads(row[0]) for row in rows if row[0] is not None]
         scored_alerts: list[dict[str, Any]] = []
 
         for alert in unranked_alerts:

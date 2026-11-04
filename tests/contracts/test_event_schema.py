@@ -24,8 +24,10 @@ def load(filename: str) -> Any:
 SCHEMA = load("event.schema.json")
 VALID = load("event.valid.json")
 INVALID = load("event.invalid.json")
+EXAMPLE_VALID = load("examples/event_valid.json")
+EXAMPLE_INVALID = load("examples/event_invalid.json")
 
-VALIDATOR = Draft7Validator(SCHEMA)
+VALIDATOR = Draft7Validator(SCHEMA, format_checker=Draft7Validator.FORMAT_CHECKER)
 
 
 def errors(event: dict[str, Any]) -> list[Any]:
@@ -62,11 +64,13 @@ def test_schema_uses_draft_7() -> None:
 def test_valid_example_is_accepted() -> None:
     """Ensure the valid example passes schema validation."""
     assert errors(VALID) == []
+    assert errors(EXAMPLE_VALID) == []
 
 
 def test_invalid_example_is_rejected() -> None:
     """Ensure the invalid example fails schema validation."""
     assert errors(INVALID)
+    assert errors(EXAMPLE_INVALID)
 
 
 def test_required_fields_are_enforced() -> None:
@@ -125,6 +129,12 @@ def test_event_id_must_be_uuid4() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_missing_timestamps_rejected() -> None:
+    """Ensure missing ts_received or ts_completed fails validation."""
+    assert errors(mutated(ts_received=_DROP))
+    assert errors(mutated(ts_completed=_DROP))
+
+
 @pytest.mark.parametrize(
     "timestamp",
     [
@@ -134,8 +144,9 @@ def test_event_id_must_be_uuid4() -> None:
     ],
 )
 def test_invalid_timestamps_rejected(timestamp: Any) -> None:
-    """Ensure invalid timestamps are rejected."""
-    assert errors(mutated(timestamp=timestamp))
+    """Ensure invalid ts_received and ts_completed timestamps are rejected."""
+    assert errors(mutated(ts_received=timestamp))
+    assert errors(mutated(ts_completed=timestamp))
 
 
 # ---------------------------------------------------------------------------
@@ -162,8 +173,8 @@ def test_subject_must_be_an_object() -> None:
     ],
 )
 def test_invalid_http_methods_rejected(method: Any) -> None:
-    """Ensure unsupported HTTP methods are rejected."""
-    assert errors(mutated(http_method=method))
+    """Ensure unsupported HTTP methods in operation.method are rejected."""
+    assert errors(mutated(operation={"method": method, "path_template": "/orders/{id}/address"}))
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +206,7 @@ def test_invalid_status_codes_rejected(status_code: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Resource type tests
+# Resource type & resource_id tests
 # ---------------------------------------------------------------------------
 
 
@@ -204,6 +215,18 @@ def test_resource_type_must_be_a_string() -> None:
     assert errors(mutated(resource_type=123))
     assert errors(mutated(resource_type=None))
     assert errors(mutated(resource_type="order")) == []
+
+
+def test_null_resource_id_accepted_on_post_create_operation() -> None:
+    """Ensure null resource_id is accepted on POST create operations."""
+    post_create_event = mutated(
+        operation={"method": "POST", "path_template": "/orders"},
+        resource_type="Order",
+        resource_id=None,
+        status_code=201,
+    )
+    assert errors(post_create_event) == []
+    assert errors(mutated(resource_id=123))
 
 
 # ---------------------------------------------------------------------------

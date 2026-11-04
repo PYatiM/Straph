@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any
 
 import pytest
 
+from services.dashboard.alert_store import SQLiteAlertStore as DashboardAlertStore
 from services.detector.alert_store import SQLiteAlertStore
+from services.ranker.service import AlertScoringService
 
 
 def _make_alert(
@@ -108,3 +111,27 @@ def test_multi_filter_querying(store: SQLiteAlertStore) -> None:
 
     # Non-existent alert
     assert store.get_alert("non-existent-id") is None
+
+
+def test_cross_service_sqlite_alert_store_interoperability(tmp_path: Path) -> None:
+    """Verify detector SQLiteAlertStore, dashboard SQLiteAlertStore, and AlertScoringService interoperate on a shared DB file."""
+    db_file = tmp_path / "shared_alerts.db"
+
+    dash_store = DashboardAlertStore(db_file)
+    det_store = SQLiteAlertStore(db_file)
+    scorer = AlertScoringService(alert_store=dash_store)
+
+    unranked = _make_alert("R2", "SKIPPED", rank_score=None)
+    dash_store.save_alert(unranked)
+
+    # Detector store can read alert saved by dashboard store
+    assert det_store.get_alert(unranked["alert_id"]) is not None
+    assert len(det_store.get_alerts(label="SKIPPED")) == 1
+
+    # Ranker service can score unranked alerts on the shared DB
+    scored = scorer.score_unranked_alerts()
+    assert len(scored) == 1
+    assert scored[0]["rank_score"] == 0.75
+
+    dash_store.close()
+    det_store.close()
