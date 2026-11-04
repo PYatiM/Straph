@@ -78,7 +78,7 @@ async def test_full_stack_prototype_e2e(alert_validator: Draft202012Validator) -
     async with gw_client, dashboard_client:
         # Replay Order 2001: Legal checkout path
         # 1. Cart
-        h_2001 = {"X-User-Sub": "customer-2001"}
+        h_2001 = {"X-User-Sub": "customer-2001", "X-User-Roles": "customer"}
         r = await gw_client.post(
             "/cart/items",
             json={"sku": "BOOK-2001", "quantity": 1},
@@ -123,7 +123,7 @@ async def test_full_stack_prototype_e2e(alert_validator: Draft202012Validator) -
 
         # Replay Order 2002: Skipped payment attack
         # 1. Cart & Order
-        h_2002 = {"X-User-Sub": "customer-2002"}
+        h_2002 = {"X-User-Sub": "customer-2002", "X-User-Roles": "customer"}
         await gw_client.post(
             "/cart/items",
             json={"sku": "LAPTOP-2002", "quantity": 1},

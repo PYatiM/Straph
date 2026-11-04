@@ -7,16 +7,16 @@ Dropped Requests (HTTP 429):     0
 False Drop Rate:                 0.00%
 
 Latency Breakdown:
-  Baseline App Median Latency:       0.8040 ms
-  Rate-Limited App Median Latency:   0.9209 ms
-  Median Added Latency (Overhead):   0.1170 ms (Target: < 1.5000 ms)
-  Mean Added Latency:                0.1259 ms
-  95th Percentile Added Latency:     0.0688 ms
-  99th Percentile Added Latency:     0.0880 ms
+  Baseline App Median Latency:       0.9340 ms
+  Rate-Limited App Median Latency:   1.1261 ms
+  Median Added Latency (Overhead):   0.1921 ms (Target: < 1.5000 ms)
+  Mean Added Latency:                0.2029 ms
+  95th Percentile Added Latency:     0.2898 ms
+  99th Percentile Added Latency:     0.2149 ms
 
 Throughput Performance:
-  Total Benchmark Duration:          0.5044 s
-  Throughput:                        991.28 req/s
+  Total Benchmark Duration:          0.6259 s
+  Throughput:                        798.86 req/s
 
 Conclusion:
   PASS: Rate limiter introduces negligible overhead (well below 1.5ms budget).
