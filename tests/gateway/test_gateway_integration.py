@@ -21,17 +21,18 @@ from services.gateway.rate_limiter import InMemoryTokenBucketRateLimiter
 @pytest.fixture
 async def gateway_env() -> AsyncIterator[tuple[httpx.AsyncClient, InMemoryEventProducer | None]]:
     """Provide gateway client and producer, either from live containers or in-memory ASGI transports."""
-    live_gateway_url = os.getenv("GATEWAY_URL", "http://localhost:8000")
+    live_gateway_url = os.getenv("GATEWAY_URL")
     live_online = False
-    try:
-        async with httpx.AsyncClient(timeout=0.5) as probe:
-            resp = await probe.get(f"{live_gateway_url}/health")
-            if resp.status_code == 200:
-                live_online = True
-    except (httpx.RequestError, TimeoutError, OSError):
-        live_online = False
+    if live_gateway_url:
+        try:
+            async with httpx.AsyncClient(timeout=0.5) as probe:
+                resp = await probe.get(f"{live_gateway_url}/health")
+                if resp.status_code == 200:
+                    live_online = True
+        except (httpx.RequestError, TimeoutError, OSError):
+            live_online = False
 
-    if live_online:
+    if live_online and live_gateway_url:
         async with httpx.AsyncClient(base_url=live_gateway_url) as client:
             yield client, None
     else:

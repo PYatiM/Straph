@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir fastapi uvicorn jsonschema jinja2 pydantic pydant
 COPY contracts/ contracts/
 COPY services/ services/
 
-RUN useradd --system --no-create-home appuser
+RUN useradd --system --no-create-home appuser && mkdir -p /data && chown -R appuser:appuser /data
 USER appuser
 
 EXPOSE 8080
