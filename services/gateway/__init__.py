@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from services.gateway.app import create_gateway_app
+from services.gateway.consumer import AsyncKafkaConsumer
 from services.gateway.rate_limit_middleware import (
     RateLimitMiddleware,
     extract_caller_sub,
@@ -15,14 +17,18 @@ from services.gateway.rate_limiter import (
     RateLimiterValidationError,
     RedisFixedWindowRateLimiter,
 )
+from services.gateway.streaming import StreamTap
 
 __all__ = [
+    "AsyncKafkaConsumer",
     "InMemoryTokenBucketRateLimiter",
     "RateLimitMiddleware",
     "RateLimiterError",
     "RateLimiterProtocol",
     "RateLimiterValidationError",
     "RedisFixedWindowRateLimiter",
+    "StreamTap",
+    "create_gateway_app",
     "extract_caller_sub",
     "extract_client_ip",
     "extract_rate_limit_key",
