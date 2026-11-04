@@ -2,40 +2,97 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
+from pathlib import Path
 from typing import Any
 
+import jsonschema
 from fastapi import FastAPI, HTTPException, Query, Request
 
 from services.dashboard.alert_store import SQLiteAlertStore
 
+log = logging.getLogger("straph.dashboard.app")
 
-def create_dashboard_app(alert_store: SQLiteAlertStore | None = None) -> FastAPI:
-    """Factory for the Dashboard FastAPI application."""
+ROOT_DIR = Path(__file__).resolve().parents[2]
+ALERT_SCHEMA_PATH = ROOT_DIR / "contracts" / "alert.schema.json"
+
+__all__ = [
+    "app",
+    "create_dashboard_app",
+]
+
+
+def _load_alert_schema() -> dict[str, Any]:
+    """Load alert schema for response contract validation."""
+    if ALERT_SCHEMA_PATH.exists():
+        with open(ALERT_SCHEMA_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def create_dashboard_app(
+    alert_store: SQLiteAlertStore | None = None,
+    schema: dict[str, Any] | None = None,
+) -> FastAPI:
+    """Factory for the read-only Dashboard FastAPI application."""
     store = alert_store or SQLiteAlertStore(os.getenv("ALERTS_DB_PATH", ":memory:"))
+    alert_schema = schema or _load_alert_schema()
 
-    app = FastAPI(title="Straph Security Dashboard API")
+    app = FastAPI(
+        title="Straph Security Dashboard API", description="Read-only security alert triage API"
+    )
     app.state.alert_store = store
+    app.state.alert_schema = alert_schema
 
-    @app.get("/health", include_in_schema=False)
+    def _validate_alert(alert: dict[str, Any]) -> None:
+        """Validate alert against contracts/alert.schema.json before sending."""
+        if app.state.alert_schema:
+            try:
+                jsonschema.validate(instance=alert, schema=app.state.alert_schema)
+            except jsonschema.ValidationError as err:
+                log.error("Outgoing alert failed contract validation: %s", err.message)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Outgoing alert contract validation failed: {err.message}",
+                ) from err
+
+    @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "healthy", "service": "straph-dashboard"}
+        """Health check endpoint."""
+        return {"status": "healthy"}
 
     @app.get("/alerts")
     def list_alerts(
         request: Request,
-        resource_id: str | None = Query(default=None),
-        label: str | None = Query(default=None),
+        label: str | None = Query(default=None, description="Filter by violation label"),
+        rule: str | None = Query(default=None, description="Filter by rule ID"),
+        severity: str | None = Query(default=None, description="Filter by severity level"),
+        min_rank: float | None = Query(default=None, description="Minimum ML priority rank score"),
+        limit: int = Query(default=50, ge=1, le=1000, description="Max alerts to return"),
     ) -> list[dict[str, Any]]:
+        """Query detection alerts filtered by criteria and validated against contract."""
         s: SQLiteAlertStore = request.app.state.alert_store
-        return s.get_alerts(resource_id=resource_id, label=label)
+        alerts = s.get_alerts(
+            label=label,
+            rule=rule,
+            severity=severity,
+            min_rank=min_rank,
+            limit=limit,
+        )
+        for alert in alerts:
+            _validate_alert(alert)
+        return alerts
 
     @app.get("/alerts/{alert_id}")
     def get_alert(alert_id: str, request: Request) -> dict[str, Any]:
+        """Retrieve a single detection alert by alert ID."""
         s: SQLiteAlertStore = request.app.state.alert_store
         alert = s.get_alert(alert_id)
         if alert is None:
             raise HTTPException(status_code=404, detail="Alert not found")
+        _validate_alert(alert)
         return alert
 
     return app
